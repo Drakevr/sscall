@@ -306,7 +306,7 @@ main(int argc, char *argv[])
 	do {
 		addr_len = sizeof(their_addr);
 		bytes = recvfrom(srv_sockfd, buf,
-				 sizeof(buf), 0,
+				 sizeof(buf), MSG_DONTWAIT,
 				 (struct sockaddr *)&their_addr,
 				 &addr_len);
 		if (bytes > 0)
