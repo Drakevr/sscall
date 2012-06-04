@@ -1,10 +1,4 @@
-/* Sample file streaming:
- *
- * cat test.wav | sscall <remote-ip> <remote-port> <local-port>
- *
- * Similarly one can use arecord(1) or similar to receive input
- * from the mic and pipe it over to sscall.
- */
+/* See LICENSE file for copyright and license details */
 
 #include <stdio.h>
 #include <stdlib.h>
