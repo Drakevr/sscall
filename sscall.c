@@ -236,9 +236,6 @@ main(int argc, char *argv[])
 	int c;
 	char host[NI_MAXHOST];
 
-	if (signal(SIGINT, sig_handler) == SIG_ERR)
-		err(1, "signal");
-
 	prog = *argv;
 	while ((c = getopt(argc, argv, "hb:c:r:d:v")) != -1) {
 		switch (c) {
@@ -380,6 +377,9 @@ main(int argc, char *argv[])
 			     NULL);
 	if (ret < 0)
 		errx(1, "pthread_create failed: %d", ret);
+
+	if (signal(SIGINT, sig_handler) == SIG_ERR)
+		err(1, "signal");
 
 	/* Receive audio data from other end and prepare
 	 * for playback */
