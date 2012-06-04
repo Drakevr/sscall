@@ -246,10 +246,8 @@ main(int argc, char *argv[])
 	cli_hints.ai_socktype = SOCK_DGRAM;
 
 	rv = getaddrinfo(argv[0], argv[1], &cli_hints, &cli_servinfo);
-	if (rv) {
+	if (rv)
 		errx(1, "getaddrinfo: %s", gai_strerror(rv));
-		return 1;
-	}
 
 	for (p0 = cli_servinfo; p0; p0 = p0->ai_next) {
 		cli_sockfd = socket(p0->ai_family, p0->ai_socktype,
@@ -270,10 +268,8 @@ main(int argc, char *argv[])
 	srv_hints.ai_flags = AI_PASSIVE;
 
 	rv = getaddrinfo(NULL, argv[2], &srv_hints, &srv_servinfo);
-	if (rv) {
+	if (rv)
 		errx(1, "getaddrinfo: %s", gai_strerror(rv));
-		return 1;
-	}
 
 	for(p1 = srv_servinfo; p1; p1 = p1->ai_next) {
 		srv_sockfd = socket(p1->ai_family, p1->ai_socktype,
