@@ -134,7 +134,7 @@ input_pcm(void *data __attribute__ ((unused)))
 				       inp_pcm_priv.servinfo->ai_addr,
 				       inp_pcm_priv.servinfo->ai_addrlen);
 			if (bytes < 0)
-				perror("sendto");
+				warn("%s", strerror(errno));
 			usleep(UDELAY_SEND);
 		}
 	} while (1);
@@ -279,7 +279,7 @@ main(int argc, char *argv[])
 			continue;
 		if (bind(srv_sockfd, p1->ai_addr, p1->ai_addrlen) < 0) {
 			close(srv_sockfd);
-			perror("bind");
+			warn("%s", strerror(errno));
 			continue;
 		}
 		break;
