@@ -300,7 +300,7 @@ main(int argc, char *argv[])
 		printf("Bits per sample: %d\n", fbits);
 		printf("Number of channels: %d\n", fchan);
 		printf("Sample rate: %d\n", frate);
-		printf("Default driver ID: %d\n", default_driver);
+		printf("Default driver ID: %d\n", fdevid);
 		fflush(stdout);
 	}
 
