@@ -175,6 +175,19 @@ sig_handler(int signum)
 	}
 }
 
+void
+set_nonblocking(int fd)
+{
+	int opts;
+
+	opts = fcntl(fd, F_GETFL);
+	if (opts < 0)
+		err(1, "fcntl");
+	opts = (opts | O_NONBLOCK);
+	if (fcntl(fd, F_SETFL, opts) < 0)
+		err(1, "fcntl");
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -325,6 +338,8 @@ main(int argc, char *argv[])
 	inp_pcm_priv.fd = recfd;
 	inp_pcm_priv.sockfd = cli_sockfd;
 	inp_pcm_priv.servinfo = p0;
+
+	set_nonblocking(inp_pcm_priv.fd);
 
 	ret = pthread_create(&input_pcm_thread, NULL,
 			     input_pcm,
