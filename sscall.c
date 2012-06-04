@@ -403,7 +403,7 @@ main(int argc, char *argv[])
 						  sizeof(host), NULL, 0, 0);
 				if (ret < 0)
 					warn("getnameinfo");
-				printf("Received %ld bytes from %s\n",
+				printf("Received %zd bytes from %s\n",
 				       bytes, host);
 			}
 			do_output_pcm(buf, bytes);
