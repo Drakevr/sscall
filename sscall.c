@@ -419,16 +419,16 @@ main(int argc, char *argv[])
 	/* Wait for it */
 	pthread_join(input_pcm_thread, NULL);
 
+	/* Prepare output thread to be killed */
+	pthread_mutex_lock(&kill_output_pcm_lock);
+	kill_output_pcm = 1;
+	pthread_mutex_unlock(&kill_output_pcm_lock);
+
 	/* Wake up the output thread if it is
 	 * sleeping */
 	pthread_mutex_lock(&pcm_buf_lock);
 	pthread_cond_signal(&tx_pcm_cond);
 	pthread_mutex_unlock(&pcm_buf_lock);
-
-	/* Prepare output thread to be killed */
-	pthread_mutex_lock(&kill_output_pcm_lock);
-	kill_output_pcm = 1;
-	pthread_mutex_unlock(&kill_output_pcm_lock);
 
 	/* Wait for it */
 	pthread_join(output_pcm_thread, NULL);
