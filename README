@@ -2,3 +2,17 @@ What is it?
 ===========
 
 A simple UDP based voice chat program.
+
+How to use it
+=============
+
+Pick one of the scripts already available and just
+pipe them over to sscall.
+
+For e.g. on OpenBSD:
+
+./obsd/obsd-rec.sh | sscall 192.168.1.2 1234 4321
+
+This will stream your voice to machine 192.168.1.2
+on port 1234.  Similarly on the other side you can
+connect on port 4321 on the local machine.
