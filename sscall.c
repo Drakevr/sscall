@@ -70,6 +70,18 @@ static pthread_mutex_t pcm_buf_lock;
 /* Condition variable on which ao_play() blocks */
 static pthread_cond_t tx_pcm_cond;
 
+/* If set, output thread is killed */
+static int kill_output_pcm;
+/* If set, input thread is killed */
+static int kill_input_pcm;
+
+/* Lock that protects the setting of the
+ * kill_output_pcm variable */
+static pthread_mutex_t kill_output_pcm_lock;
+/* Lock that protects the setting of the
+ * kill_input_pcm variable */
+static pthread_mutex_t kill_input_pcm_lock;
+
 /* Set to 1 when SIGINT is received */
 static volatile int handle_sigint;
 
@@ -85,6 +97,14 @@ output_pcm(void *data __attribute__ ((unused)))
 		if (list_empty(&pcm_buf.list))
 			pthread_cond_wait(&tx_pcm_cond,
 					  &pcm_buf_lock);
+
+		pthread_mutex_lock(&kill_output_pcm_lock);
+		if (kill_output_pcm) {
+			pthread_mutex_unlock(&kill_output_pcm_lock);
+			break;
+		}
+		pthread_mutex_unlock(&kill_output_pcm_lock);
+
 		/* Dequeue and play buffers via libao */
 		list_for_each_safe(iter, q, &pcm_buf.list) {
 			pctx = list_entry(iter, struct pcm_buf,
@@ -96,6 +116,8 @@ output_pcm(void *data __attribute__ ((unused)))
 		}
 		pthread_mutex_unlock(&pcm_buf_lock);
 	} while (1);
+
+	pthread_exit(NULL);
 
 	return NULL;
 }
@@ -134,6 +156,13 @@ input_pcm(void *data __attribute__ ((unused)))
 	ssize_t bytes;
 
 	do {
+		pthread_mutex_lock(&kill_input_pcm_lock);
+		if (kill_input_pcm) {
+			pthread_mutex_unlock(&kill_input_pcm_lock);
+			break;
+		}
+		pthread_mutex_unlock(&kill_input_pcm_lock);
+
 		bytes = read(inp_pcm_priv.fd, buf, sizeof(buf));
 		if (bytes > 0) {
 			bytes = sendto(inp_pcm_priv.sockfd, buf,
@@ -145,6 +174,8 @@ input_pcm(void *data __attribute__ ((unused)))
 			usleep(UDELAY_SEND);
 		}
 	} while (1);
+
+	pthread_exit(NULL);
 
 	return NULL;
 }
@@ -329,6 +360,9 @@ main(int argc, char *argv[])
 	pthread_mutex_init(&pcm_buf_lock, NULL);
 	pthread_cond_init(&tx_pcm_cond, NULL);
 
+	pthread_mutex_init(&kill_output_pcm_lock, NULL);
+	pthread_mutex_init(&kill_input_pcm_lock, NULL);
+
 	ret = pthread_create(&output_pcm_thread, NULL,
 			     output_pcm,
 			     NULL);
@@ -375,6 +409,28 @@ main(int argc, char *argv[])
 			do_output_pcm(buf, bytes);
 		}
 	} while (1);
+
+	/* Prepare input thread to be killed */
+	pthread_mutex_lock(&kill_input_pcm_lock);
+	kill_input_pcm = 1;
+	pthread_mutex_unlock(&kill_input_pcm_lock);
+
+	/* Wait for it */
+	pthread_join(input_pcm_thread, NULL);
+
+	/* Wake up the output thread if it is
+	 * sleeping */
+	pthread_mutex_lock(&pcm_buf_lock);
+	pthread_cond_signal(&tx_pcm_cond);
+	pthread_mutex_unlock(&pcm_buf_lock);
+
+	/* Prepare output thread to be killed */
+	pthread_mutex_lock(&kill_output_pcm_lock);
+	kill_output_pcm = 1;
+	pthread_mutex_unlock(&kill_output_pcm_lock);
+
+	/* Wait for it */
+	pthread_join(output_pcm_thread, NULL);
 
 	ao_close(device);
 	ao_shutdown();
