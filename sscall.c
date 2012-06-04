@@ -324,8 +324,6 @@ main(int argc, char *argv[])
 	if (!p0)
 		errx(1, "failed to bind socket");
 
-	freeaddrinfo(cli_servinfo);
-
 	memset(&srv_hints, 0, sizeof(srv_hints));
 	srv_hints.ai_family = AF_INET;
 	srv_hints.ai_socktype = SOCK_DGRAM;
@@ -350,8 +348,6 @@ main(int argc, char *argv[])
 
 	if (!p1)
 		errx(1, "failed to bind socket");
-
-	freeaddrinfo(srv_servinfo);
 
 	INIT_LIST_HEAD(&pcm_buf.list);
 
@@ -435,6 +431,9 @@ main(int argc, char *argv[])
 
 	ao_close(device);
 	ao_shutdown();
+
+	freeaddrinfo(cli_servinfo);
+	freeaddrinfo(srv_servinfo);
 
 	return EXIT_SUCCESS;
 }
