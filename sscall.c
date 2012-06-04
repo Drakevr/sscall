@@ -101,6 +101,7 @@ output_pcm(void *data __attribute__ ((unused)))
 		pthread_mutex_lock(&kill_output_pcm_lock);
 		if (kill_output_pcm) {
 			pthread_mutex_unlock(&kill_output_pcm_lock);
+			pthread_mutex_unlock(&pcm_buf_lock);
 			break;
 		}
 		pthread_mutex_unlock(&kill_output_pcm_lock);
