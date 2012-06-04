@@ -8,7 +8,7 @@ LDFLAGS += -lao -lpthread -L/usr/local/lib
 
 all: $(bin)
 
-%: %.c 
+%: %.c
 	$(CC) -o $(bin) $(src) $(CFLAGS) $(LDFLAGS)
 
 clean:
