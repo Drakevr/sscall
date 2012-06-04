@@ -107,16 +107,19 @@ do_output_pcm(const void *buf, size_t len)
 {
 	struct pcm_buf *pctx;
 
-	pthread_mutex_lock(&pcm_buf_lock);
 	pctx = malloc(sizeof(*pctx));
 	if (!pctx)
 		err(1, "malloc");
 	memset(pctx, 0, sizeof(*pctx));
+
 	pctx->buf = malloc(len);
 	if (!pctx->buf)
 		err(1, "malloc");
+
 	pctx->len = len;
 	memcpy(pctx->buf, buf, len);
+
+	pthread_mutex_lock(&pcm_buf_lock);
 	INIT_LIST_HEAD(&pctx->list);
 	list_add_tail(&pctx->list, &pcm_buf.list);
 	pthread_cond_signal(&tx_pcm_cond);
