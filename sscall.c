@@ -31,6 +31,8 @@ static int frate;
 static int fchan;
 /* Command line option, device driver ID */
 static int fdevid;
+/* Command line option, verbosity flag */
+static int fverbose;
 
 /* Libao handle */
 static ao_device *device;
@@ -149,6 +151,7 @@ usage(const char *s)
 	fprintf(stderr, " -r\tSamples per second (in a single channel)\n");
 	fprintf(stderr, " -c\tNumber of channels\n");
 	fprintf(stderr, " -d\tOverride default driver ID\n");
+	fprintf(stderr, " -v\tEnable verbose output\n");
 	fprintf(stderr, " -h\tThis help screen\n");
 	exit(EXIT_SUCCESS);
 }
@@ -170,7 +173,7 @@ main(int argc, char *argv[])
 	int c;
 
 	prog = *argv;
-	while ((c = getopt(argc, argv, "hb:c:r:d:")) != -1) {
+	while ((c = getopt(argc, argv, "hb:c:r:d:v")) != -1) {
 		switch (c) {
 		case 'h':
 			usage(prog);
@@ -186,6 +189,9 @@ main(int argc, char *argv[])
 			break;
 		case 'd':
 			fdevid = strtol(optarg, NULL, 10);
+			break;
+		case 'v':
+			fverbose = 1;
 			break;
 		case '?':
 		default:
@@ -203,28 +209,36 @@ main(int argc, char *argv[])
 	default_driver = ao_default_driver_id();
 
 	memset(&format, 0, sizeof(format));
-	if (fbits)
-		format.bits = fbits;
-	else
-		format.bits = 16;
-	if (fchan)
-		format.channels = fchan;
-	else
-		format.channels = 2;
-	if (frate)
-		format.rate = frate;
-	else
-		format.rate = 8000;
+
+	if (!fbits)
+		fbits = 16;
+
+	if (!fchan)
+		fchan = 2;
+
+	if (!frate)
+		frate = 8000;
+
+	format.bits = fbits;
+	format.channels = fchan;
+	format.rate = frate;
 	format.byte_format = AO_FMT_LITTLE;
 
-	if (fdevid)
-		default_driver = fdevid;
+	if (!fdevid)
+		fdevid = default_driver;
 
-	device = ao_open_live(default_driver,
-			      &format, NULL);
+	device = ao_open_live(fdevid, &format, NULL);
 	if (!device)
 		errx(1, "Error opening output device: %d\n",
-		     default_driver);
+		     fdevid);
+
+	if (fverbose) {
+		printf("Bits per sample: %d\n", fbits);
+		printf("Number of channels: %d\n", fchan);
+		printf("Sample rate: %d\n", frate);
+		printf("Default driver ID: %d\n", default_driver);
+		fflush(stdout);
+	}
 
 	memset(&cli_hints, 0, sizeof(cli_hints));
 	cli_hints.ai_family = AF_INET;
