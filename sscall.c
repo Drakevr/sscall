@@ -70,6 +70,7 @@ static pthread_mutex_t pcm_buf_lock;
 /* Condition variable on which ao_play() blocks */
 static pthread_cond_t tx_pcm_cond;
 
+/* Set to 1 when SIGINT is received */
 static volatile int handle_sigint;
 
 /* Play back audio from the client */
