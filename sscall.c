@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <err.h>
+#include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -68,6 +69,8 @@ struct inp_pcm_priv {
 static pthread_mutex_t pcm_buf_lock;
 /* Condition variable on which ao_play() blocks */
 static pthread_cond_t tx_pcm_cond;
+
+static volatile int handle_sigint;
 
 /* Play back audio from the client */
 static void *
@@ -156,6 +159,18 @@ usage(const char *s)
 	exit(EXIT_SUCCESS);
 }
 
+static void
+sig_handler(int signum)
+{
+	switch (signum) {
+	case SIGINT:
+		handle_sigint = 1;
+		break;
+	default:
+		break;
+	}
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -172,6 +187,9 @@ main(int argc, char *argv[])
 	char *prog;
 	int c;
 	char host[NI_MAXHOST];
+
+	if (signal(SIGINT, sig_handler) == SIG_ERR)
+		err(1, "signal");
 
 	prog = *argv;
 	while ((c = getopt(argc, argv, "hb:c:r:d:v")) != -1) {
@@ -313,6 +331,13 @@ main(int argc, char *argv[])
 	/* Receive audio data from other end and prepare
 	 * for playback */
 	do {
+		/* Handle SIGINT gracefully */
+		if (handle_sigint) {
+			if (fverbose)
+				printf("Interrupted, exiting...\n");
+			break;
+		}
+
 		addr_len = sizeof(their_addr);
 		bytes = recvfrom(srv_sockfd, buf,
 				 sizeof(buf), MSG_DONTWAIT,
