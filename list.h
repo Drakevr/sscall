@@ -1,7 +1,8 @@
 #ifndef _LIST_H
 #define _LIST_H
 
-#define offsetof(TYPE, MEMBER) ((size_t)__builtin_offsetof(TYPE, MEMBER))
+#include <stddef.h>
+
 #define container_of(ptr, type, member) ({ const typeof( ((type *)0)->member ) *__mptr = (ptr); (type *)( (char *)__mptr - offsetof(type,member) ); })
 
 /**
