@@ -234,7 +234,7 @@ main(int argc, char *argv[])
 		fbits = 16;
 
 	if (!fchan)
-		fchan = 2;
+		fchan = 1;
 
 	if (!frate)
 		frate = 8000;
