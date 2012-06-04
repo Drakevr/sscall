@@ -1,2 +1,4 @@
 * Add flow control
 * Figure out stream properties on the fly
+* Add compression to the streams
+* Add encryption
