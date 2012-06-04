@@ -138,7 +138,7 @@ input_pcm(void *data __attribute__ ((unused)))
 				       inp_pcm_priv.servinfo->ai_addr,
 				       inp_pcm_priv.servinfo->ai_addrlen);
 			if (bytes < 0)
-				warn("%s", strerror(errno));
+				warn("sendto");
 			usleep(UDELAY_SEND);
 		}
 	} while (1);
@@ -297,7 +297,7 @@ main(int argc, char *argv[])
 			continue;
 		if (bind(srv_sockfd, p1->ai_addr, p1->ai_addrlen) < 0) {
 			close(srv_sockfd);
-			warn("%s", strerror(errno));
+			warn("bind");
 			continue;
 		}
 		break;
@@ -350,7 +350,7 @@ main(int argc, char *argv[])
 						  addr_len, host,
 						  sizeof(host), NULL, 0, 0);
 				if (ret < 0)
-					warn("%s", strerror(errno));
+					warn("getnameinfo");
 				printf("Received %ld bytes from %s\n",
 				       bytes, host);
 			}
