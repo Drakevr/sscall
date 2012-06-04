@@ -1,17 +1,21 @@
 bin = sscall
 ver = 0.1
-src = sscall.c
+obj = sscall.o
 
 CC = gcc
 CFLAGS += -Wall -Wextra -I/usr/local/include
 LDFLAGS += -lao -lpthread -L/usr/local/lib
 
-all: $(bin)
+$(bin): $(obj)
+	$(CC) $(CFLAGS) -o $@ $(obj) $(LDFLAGS)
 
-%: %.c
-	$(CC) -o $(bin) $(src) $(CFLAGS) $(LDFLAGS)
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	@rm -rf $(bin)
+	@rm -rf $(bin) $(obj)
+
+all:
+	make clean && make
 
 .PHONY: all clean
