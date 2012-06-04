@@ -233,7 +233,7 @@ main(int argc, char *argv[])
 		     default_driver);
 
 	memset(&cli_hints, 0, sizeof(cli_hints));
-	cli_hints.ai_family = AF_UNSPEC;
+	cli_hints.ai_family = AF_INET;
 	cli_hints.ai_socktype = SOCK_DGRAM;
 
 	rv = getaddrinfo(argv[0], argv[1], &cli_hints, &cli_servinfo);
