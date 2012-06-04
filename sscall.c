@@ -262,7 +262,7 @@ main(int argc, char *argv[])
 		errx(1, "failed to bind socket");
 
 	memset(&srv_hints, 0, sizeof(srv_hints));
-	srv_hints.ai_family = AF_UNSPEC;
+	srv_hints.ai_family = AF_INET;
 	srv_hints.ai_socktype = SOCK_DGRAM;
 	srv_hints.ai_flags = AI_PASSIVE;
 
