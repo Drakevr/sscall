@@ -171,6 +171,7 @@ main(int argc, char *argv[])
 	struct sockaddr_storage their_addr;
 	char *prog;
 	int c;
+	char host[NI_MAXHOST];
 
 	prog = *argv;
 	while ((c = getopt(argc, argv, "hb:c:r:d:v")) != -1) {
@@ -321,8 +322,18 @@ main(int argc, char *argv[])
 				 sizeof(buf), MSG_DONTWAIT,
 				 (struct sockaddr *)&their_addr,
 				 &addr_len);
-		if (bytes > 0)
+		if (bytes > 0) {
+			if (fverbose) {
+				ret = getnameinfo((struct sockaddr *)&their_addr,
+						  addr_len, host,
+						  sizeof(host), NULL, 0, 0);
+				if (ret < 0)
+					warn("%s", strerror(errno));
+				printf("Received %ld bytes from %s\n",
+				       bytes, host);
+			}
 			do_output_pcm(buf, bytes);
+		}
 	} while (1);
 
 	ao_close(device);
