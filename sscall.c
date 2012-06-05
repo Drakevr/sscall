@@ -70,27 +70,31 @@ static pthread_mutex_t pcm_buf_lock;
 /* Condition variable on which ao_play() blocks */
 static pthread_cond_t tx_pcm_cond;
 
-/* If set, output thread is killed */
-static int kill_output_pcm;
-/* If set, input thread is killed */
-static int kill_input_pcm;
+/* State of the output_pcm thread */
+struct output_pcm_state {
+	int quit;
+} output_pcm_state;
 
-/* Lock that protects the setting of the
- * kill_output_pcm variable */
-static pthread_mutex_t kill_output_pcm_lock;
-/* Lock that protects the setting of the
- * kill_input_pcm variable */
-static pthread_mutex_t kill_input_pcm_lock;
+/* State of the input_pcm thread */
+struct input_pcm_state {
+	int quit;
+} input_pcm_state;
+
+/* Lock that protects output_pcm_state */
+static pthread_mutex_t output_pcm_state_lock;
+/* Lock that protects input_pcm_state */
+static pthread_mutex_t input_pcm_state_lock;
 
 /* Set to 1 when SIGINT is received */
 static volatile int handle_sigint;
 
 /* Play back audio from the client */
 static void *
-output_pcm(void *data __attribute__ ((unused)))
+output_pcm(void *data)
 {
 	struct pcm_buf *pctx;
 	struct list_head *iter, *q;
+	struct output_pcm_state *state = data;
 
 	do {
 		pthread_mutex_lock(&pcm_buf_lock);
@@ -98,13 +102,13 @@ output_pcm(void *data __attribute__ ((unused)))
 			pthread_cond_wait(&tx_pcm_cond,
 					  &pcm_buf_lock);
 
-		pthread_mutex_lock(&kill_output_pcm_lock);
-		if (kill_output_pcm) {
-			pthread_mutex_unlock(&kill_output_pcm_lock);
+		pthread_mutex_lock(&output_pcm_state_lock);
+		if (state->quit) {
+			pthread_mutex_unlock(&output_pcm_state_lock);
 			pthread_mutex_unlock(&pcm_buf_lock);
 			break;
 		}
-		pthread_mutex_unlock(&kill_output_pcm_lock);
+		pthread_mutex_unlock(&output_pcm_state_lock);
 
 		/* Dequeue and play buffers via libao */
 		list_for_each_safe(iter, q, &pcm_buf.list) {
@@ -151,18 +155,19 @@ do_output_pcm(const void *buf, size_t len)
 
 /* Input PCM thread, outbound path */
 static void *
-input_pcm(void *data __attribute__ ((unused)))
+input_pcm(void *data)
 {
 	char buf[PCM_BUF_SIZE];
 	ssize_t bytes;
+	struct input_pcm_state *state = data;
 
 	do {
-		pthread_mutex_lock(&kill_input_pcm_lock);
-		if (kill_input_pcm) {
-			pthread_mutex_unlock(&kill_input_pcm_lock);
+		pthread_mutex_lock(&input_pcm_state_lock);
+		if (state->quit) {
+			pthread_mutex_unlock(&input_pcm_state_lock);
 			break;
 		}
-		pthread_mutex_unlock(&kill_input_pcm_lock);
+		pthread_mutex_unlock(&input_pcm_state_lock);
 
 		bytes = read(inp_pcm_priv.fd, buf, sizeof(buf));
 		if (bytes > 0) {
@@ -363,12 +368,11 @@ main(int argc, char *argv[])
 	pthread_mutex_init(&pcm_buf_lock, NULL);
 	pthread_cond_init(&tx_pcm_cond, NULL);
 
-	pthread_mutex_init(&kill_output_pcm_lock, NULL);
-	pthread_mutex_init(&kill_input_pcm_lock, NULL);
+	pthread_mutex_init(&output_pcm_state_lock, NULL);
+	pthread_mutex_init(&input_pcm_state_lock, NULL);
 
 	ret = pthread_create(&output_pcm_thread, NULL,
-			     output_pcm,
-			     NULL);
+			     output_pcm, &output_pcm_state);
 	if (ret < 0)
 		errx(1, "pthread_creapte failed: %d", ret);
 
@@ -379,8 +383,7 @@ main(int argc, char *argv[])
 	set_nonblocking(inp_pcm_priv.fd);
 
 	ret = pthread_create(&input_pcm_thread, NULL,
-			     input_pcm,
-			     NULL);
+			     input_pcm, &input_pcm_state);
 	if (ret < 0)
 		errx(1, "pthread_create failed: %d", ret);
 
@@ -417,17 +420,17 @@ main(int argc, char *argv[])
 	} while (1);
 
 	/* Prepare input thread to be killed */
-	pthread_mutex_lock(&kill_input_pcm_lock);
-	kill_input_pcm = 1;
-	pthread_mutex_unlock(&kill_input_pcm_lock);
+	pthread_mutex_lock(&input_pcm_state_lock);
+	input_pcm_state.quit = 1;
+	pthread_mutex_unlock(&input_pcm_state_lock);
 
 	/* Wait for it */
 	pthread_join(input_pcm_thread, NULL);
 
 	/* Prepare output thread to be killed */
-	pthread_mutex_lock(&kill_output_pcm_lock);
-	kill_output_pcm = 1;
-	pthread_mutex_unlock(&kill_output_pcm_lock);
+	pthread_mutex_lock(&output_pcm_state_lock);
+	output_pcm_state.quit = 1;
+	pthread_mutex_unlock(&output_pcm_state_lock);
 
 	/* Wake up the output thread if it is
 	 * sleeping */
