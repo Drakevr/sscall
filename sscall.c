@@ -13,6 +13,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <sys/time.h>
+#include <time.h>
 
 #include <ao/ao.h>
 #include <pthread.h>
@@ -95,12 +97,29 @@ output_pcm(void *data)
 	struct pcm_buf *pctx;
 	struct list_head *iter, *q;
 	struct output_pcm_state *state = data;
+	struct timespec ts;
+	struct timeval tp;
+	int rc;
 
 	do {
 		pthread_mutex_lock(&pcm_buf_lock);
-		if (list_empty(&pcm_buf.list))
-			pthread_cond_wait(&tx_pcm_cond,
-					  &pcm_buf_lock);
+		gettimeofday(&tp, NULL);
+		/* Convert from timeval to timespec */
+		ts.tv_sec = tp.tv_sec;
+		ts.tv_nsec = tp.tv_usec * 1000;
+		/* Default to a 3 second wait internal */
+		ts.tv_sec += 3;
+
+		if (list_empty(&pcm_buf.list)) {
+			/* Wait at most 3 seconds to give some
+			 * grace to perform cleanup if necessary */
+			rc = pthread_cond_timedwait(&tx_pcm_cond,
+						    &pcm_buf_lock,
+						    &ts);
+			if (rc == ETIMEDOUT)
+				if (fverbose)
+					printf("Output thread is starving...\n");
+		}
 
 		pthread_mutex_lock(&output_pcm_state_lock);
 		if (state->quit) {
