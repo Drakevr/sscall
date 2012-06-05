@@ -1,4 +1,5 @@
 * Add flow control
 * Figure out stream properties on the fly
-* Add compression to the streams
-* Add encryption
+* Add compression to the streams (libspeex?)
+* Add encryption (dtls?)
+* Switch over to multiplexed I/O and get rid of threads
