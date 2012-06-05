@@ -438,8 +438,10 @@ main(int argc, char *argv[])
 				ret = getnameinfo((struct sockaddr *)&their_addr,
 						  addr_len, host,
 						  sizeof(host), NULL, 0, 0);
-				if (ret < 0)
+				if (ret < 0) {
 					warn("getnameinfo");
+					snprintf(host, sizeof(host), "unknown");
+				}
 				printf("Received %zd bytes from %s\n",
 				       bytes, host);
 			}
