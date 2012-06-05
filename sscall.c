@@ -214,7 +214,6 @@ usage(const char *s)
 	fprintf(stderr, " -d\tOverride default driver ID\n");
 	fprintf(stderr, " -v\tEnable verbose output\n");
 	fprintf(stderr, " -h\tThis help screen\n");
-	exit(EXIT_SUCCESS);
 }
 
 static void
@@ -291,6 +290,7 @@ main(int argc, char *argv[])
 		switch (c) {
 		case 'h':
 			usage(prog);
+			exit(0);
 			break;
 		case 'b':
 			fbits = strtol(optarg, NULL, 10);
@@ -309,14 +309,16 @@ main(int argc, char *argv[])
 			break;
 		case '?':
 		default:
-			exit(EXIT_FAILURE);
+			exit(1);
 		}
 	}
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 3)
+	if (argc != 3) {
 		usage(prog);
+		exit(1);
+	}
 
 	if (!fbits)
 		fbits = 16;
