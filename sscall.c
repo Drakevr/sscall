@@ -236,6 +236,7 @@ main(int argc, char *argv[])
 	char *prog;
 	int c;
 	char host[NI_MAXHOST];
+	int optval;
 
 	prog = *argv;
 	while ((c = getopt(argc, argv, "hb:c:r:d:v")) != -1) {
@@ -338,6 +339,14 @@ main(int argc, char *argv[])
 				    p1->ai_protocol);
 		if (srv_sockfd < 0)
 			continue;
+		optval = 1;
+		ret = setsockopt(srv_sockfd, SOL_SOCKET,
+				 SO_REUSEADDR, &optval, sizeof(optval));
+		if (ret < 0) {
+			close(srv_sockfd);
+			warn("setsockopt");
+			continue;
+		}
 		if (bind(srv_sockfd, p1->ai_addr, p1->ai_addrlen) < 0) {
 			close(srv_sockfd);
 			warn("bind");
