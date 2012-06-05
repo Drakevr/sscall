@@ -48,6 +48,8 @@ static pthread_t output_pcm_thread;
 /* Input PCM thread */
 static pthread_t input_pcm_thread;
 
+/* Shared buf between do_output_pcm()
+ * and output_pcm thread */
 struct pcm_buf {
 	/* PCM buffer */
 	void *buf;
