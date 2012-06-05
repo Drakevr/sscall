@@ -402,7 +402,7 @@ main(int argc, char *argv[])
 	ret = pthread_create(&output_pcm_thread, NULL,
 			     output_pcm, &output_pcm_state);
 	if (ret < 0)
-		errx(1, "pthread_creapte failed: %d", ret);
+		err(1, "pthread_create");
 
 	inp_pcm_priv.fd = recfd;
 	inp_pcm_priv.sockfd = cli_sockfd;
@@ -413,7 +413,7 @@ main(int argc, char *argv[])
 	ret = pthread_create(&input_pcm_thread, NULL,
 			     input_pcm, &input_pcm_state);
 	if (ret < 0)
-		errx(1, "pthread_create failed: %d", ret);
+		err(1, "pthread_create");
 
 	if (signal(SIGINT, sig_handler) == SIG_ERR)
 		err(1, "signal");
