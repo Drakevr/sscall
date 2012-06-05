@@ -39,10 +39,6 @@ static int fverbose;
 
 /* Libao handle */
 static ao_device *device;
-/* Libao sample format, currently only 44.1kHz */
-static ao_sample_format format;
-/* Default driver ID */
-static int default_driver;
 /* Output PCM thread */
 static pthread_t output_pcm_thread;
 /* Input PCM thread */
@@ -246,6 +242,32 @@ set_nonblocking(int fd)
 		err(1, "fcntl");
 }
 
+static void
+init_libao(int rate, int bits, int chans,
+	   int *devid)
+{
+	ao_sample_format format;
+	int default_driver;
+
+	ao_initialize();
+
+	default_driver = ao_default_driver_id();
+
+	memset(&format, 0, sizeof(format));
+	format.bits = bits;
+	format.channels = chans;
+	format.rate = rate;
+	format.byte_format = AO_FMT_LITTLE;
+
+	if (!*devid)
+		*devid = default_driver;
+
+	device = ao_open_live(*devid, &format, NULL);
+	if (!device)
+		errx(1, "Error opening output device: %d\n",
+		     fdevid);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -296,10 +318,6 @@ main(int argc, char *argv[])
 	if (argc != 3)
 		usage(prog);
 
-	ao_initialize();
-
-	default_driver = ao_default_driver_id();
-
 	if (!fbits)
 		fbits = 16;
 
@@ -309,19 +327,7 @@ main(int argc, char *argv[])
 	if (!frate)
 		frate = 8000;
 
-	memset(&format, 0, sizeof(format));
-	format.bits = fbits;
-	format.channels = fchan;
-	format.rate = frate;
-	format.byte_format = AO_FMT_LITTLE;
-
-	if (!fdevid)
-		fdevid = default_driver;
-
-	device = ao_open_live(fdevid, &format, NULL);
-	if (!device)
-		errx(1, "Error opening output device: %d\n",
-		     fdevid);
+	init_libao(frate, fbits, fchan, &fdevid);
 
 	if (fverbose) {
 		printf("Bits per sample: %d\n", fbits);
