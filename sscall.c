@@ -300,8 +300,6 @@ main(int argc, char *argv[])
 
 	default_driver = ao_default_driver_id();
 
-	memset(&format, 0, sizeof(format));
-
 	if (!fbits)
 		fbits = 16;
 
@@ -311,6 +309,7 @@ main(int argc, char *argv[])
 	if (!frate)
 		frate = 8000;
 
+	memset(&format, 0, sizeof(format));
 	format.bits = fbits;
 	format.channels = fchan;
 	format.rate = frate;
