@@ -109,7 +109,7 @@ output_pcm(void *data)
 		ts.tv_sec += 3;
 
 		if (list_empty(&pcm_buf.list)) {
-			/* Wait at most 3 seconds to give some
+			/* Wait in the worst case 3 seconds to give some
 			 * grace to perform cleanup if necessary */
 			rc = pthread_cond_timedwait(&tx_pcm_cond,
 						    &pcm_buf_lock,
