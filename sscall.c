@@ -15,14 +15,18 @@
 #include <netdb.h>
 #include <sys/time.h>
 #include <time.h>
+#include <stdint.h>
 
 #include <ao/ao.h>
 #include <pthread.h>
+#include <speex/speex.h>
 
 #include "list.h"
 
 /* Input/Output PCM buffer size */
-#define PCM_BUF_SIZE (8192)
+#define PCM_BUF_SIZE (8000)
+/* Input/Output compressed buffer size */
+#define COMPRESSED_BUF_SIZE (640)
 /* Sleep at least 50ms between each sendto() call */
 #define UDELAY_SEND (50 * 1000)
 
@@ -37,6 +41,11 @@ static int fdevid;
 /* Command line option, verbosity flag */
 static int fverbose;
 
+/* Libspeex state */
+void *speex_enc_state;
+void *speex_dec_state;
+/* Desired frame size, queried at run-time */
+static int speex_frame_size;
 /* Libao handle */
 static ao_device *device;
 /* Output PCM thread */
@@ -48,7 +57,7 @@ static pthread_t input_pcm_thread;
  * and output_pcm thread */
 struct pcm_buf {
 	/* PCM buffer */
-	void *buf;
+	char *buf;
 	/* PCM buffer size */
 	size_t len;
 	struct list_head list;
@@ -98,7 +107,12 @@ output_pcm(void *data)
 	struct timespec ts;
 	struct timeval tp;
 	int rc;
+	SpeexBits bits;
+	short *out;
+	uint8_t *frame_len;
+	char *p;
 
+	speex_bits_init(&bits);
 	do {
 		pthread_mutex_lock(&pcm_buf_lock);
 		gettimeofday(&tp, NULL);
@@ -127,15 +141,46 @@ output_pcm(void *data)
 		}
 		pthread_mutex_unlock(&output_pcm_state_lock);
 
-		/* Dequeue and play buffers via libao */
+		out = malloc(speex_frame_size * sizeof(*out));
+		if (!out)
+			err(1, "malloc");
+
+		/* Dequeue, decode and play buffers via libao */
 		list_for_each_safe(iter, q, &pcm_buf.list) {
 			pctx = list_entry(iter, struct pcm_buf,
 					  list);
-			ao_play(device, pctx->buf, pctx->len);
+			p = pctx->buf;
+			while (1) {
+				frame_len = (uint8_t *)p;
+				if (!*frame_len)
+					warnx("Invalid frame length: %hhu\n",
+					      *frame_len);
+				if (p + 1 + *frame_len >
+				    pctx->buf + pctx->len - 1)
+					break;
+				p++;
+				speex_bits_reset(&bits);
+				/* Copy the data into the bit-stream format */
+				speex_bits_read_from(&bits, p,
+						     *frame_len);
+				p += *frame_len;
+				/* Ensure output buffer is zero-filled */
+				memset(out, 0,
+				       speex_frame_size * sizeof(*out));
+				/* Decode it */
+				speex_decode_int(speex_dec_state, &bits,
+						 out);
+				/* Play it! */
+				ao_play(device, (char *)out,
+					speex_frame_size * sizeof(*out));
+				/* Each frame is approximately 20ms */
+				usleep(20);
+			}
 			free(pctx->buf);
 			list_del(&pctx->list);
 			free(pctx);
 		}
+		free(out);
 		pthread_mutex_unlock(&pcm_buf_lock);
 	} while (1);
 
@@ -174,10 +219,22 @@ do_output_pcm(const void *buf, size_t len)
 static void *
 input_pcm(void *data)
 {
-	char buf[PCM_BUF_SIZE];
-	ssize_t bytes;
 	struct input_pcm_state *state = data;
+	SpeexBits bits;
+	char inbuf[PCM_BUF_SIZE];
+	char outbuf[COMPRESSED_BUF_SIZE];
+	ssize_t inbytes;
+	size_t outbytes;
+	char *p, *q;
+	short *in;
+	int nr_frames;
+	/* Expected number of bytes for compressed frame */
+	int out_expected;
+	uint8_t *frame_len;
+	ssize_t i;
+	ssize_t ret;
 
+	speex_bits_init(&bits);
 	do {
 		pthread_mutex_lock(&input_pcm_state_lock);
 		if (state->quit) {
@@ -186,13 +243,52 @@ input_pcm(void *data)
 		}
 		pthread_mutex_unlock(&input_pcm_state_lock);
 
-		bytes = read(inp_pcm_priv.fd, buf, sizeof(buf));
-		if (bytes > 0) {
-			bytes = sendto(inp_pcm_priv.sockfd, buf,
-				       bytes, 0,
-				       inp_pcm_priv.servinfo->ai_addr,
-				       inp_pcm_priv.servinfo->ai_addrlen);
-			if (bytes < 0)
+		inbytes = read(inp_pcm_priv.fd, inbuf, sizeof(inbuf));
+		if (inbytes > 0) {
+			outbytes = 0;
+			/* Fixed to 16 bits for now */
+			nr_frames = (inbytes / 2) / speex_frame_size;
+			/* Allocate buffer for Speex processing */
+			in = malloc(speex_frame_size * sizeof(*in));
+			if (!in)
+				err(1, "malloc");
+
+			p = outbuf;
+			q = inbuf;
+			for (i = 0; i < nr_frames; i++) {
+				/* Reset the bit-stream struct */
+				speex_bits_reset(&bits);
+				/* Copy in PCM into input buffer for Speex
+				 * to process it */
+				memcpy(in, q, speex_frame_size * sizeof(*in));
+				q += speex_frame_size * sizeof(*in);
+				/* Encode the input stream */
+				speex_encode_int(speex_enc_state, in, &bits);
+				/* Fetch the size of the compressed frame */
+				out_expected = speex_bits_nbytes(&bits);
+				if (p + out_expected + 1 >=
+				    &outbuf[sizeof(outbuf) - 1])
+					break;
+				frame_len = (uint8_t *)p;
+				/* Pre-append the size of the frame */
+				*frame_len = out_expected;
+				p++;
+				outbytes++;
+				/* Fill up the buffer with the encoded stream */
+				speex_bits_write(&bits, p,
+						 out_expected);
+				p += out_expected;
+				outbytes += out_expected;
+				if (q >= &inbuf[inbytes - 1])
+					break;
+			}
+			free(in);
+
+			ret = sendto(inp_pcm_priv.sockfd, outbuf,
+				     outbytes, 0,
+				     inp_pcm_priv.servinfo->ai_addr,
+				     inp_pcm_priv.servinfo->ai_addrlen);
+			if (ret < 0)
 				warn("sendto");
 			usleep(UDELAY_SEND);
 		}
@@ -267,6 +363,25 @@ init_libao(int rate, int bits, int chans,
 		     fdevid);
 }
 
+static void
+init_speex(void)
+{
+	int tmp;
+
+	/* Create a new encoder/decoder state in narrowband mode */
+	speex_enc_state = speex_encoder_init(&speex_nb_mode);
+	speex_dec_state = speex_decoder_init(&speex_nb_mode);
+	/* Set the quality to 8 (15 kbps) */
+	tmp = 8;
+	speex_encoder_ctl(speex_enc_state, SPEEX_SET_QUALITY, &tmp);
+	/* Set the perceptual enhancement on */
+	tmp = 1;
+	speex_decoder_ctl(speex_dec_state, SPEEX_SET_ENH, &tmp);
+	/* Retrieve the preferred frame size */
+	speex_encoder_ctl(speex_enc_state, SPEEX_GET_FRAME_SIZE,
+			  &speex_frame_size);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -330,6 +445,7 @@ main(int argc, char *argv[])
 		frate = 8000;
 
 	init_libao(frate, fbits, fchan, &fdevid);
+	init_speex();
 
 	if (fverbose) {
 		printf("Bits per sample: %d\n", fbits);
