@@ -326,7 +326,7 @@ sig_handler(int signum)
 	}
 }
 
-void
+static void
 set_nonblocking(int fd)
 {
 	int opts;
