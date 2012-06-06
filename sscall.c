@@ -266,7 +266,7 @@ input_pcm(void *data)
 				speex_encode_int(speex_enc_state, in, &bits);
 				/* Fetch the size of the compressed frame */
 				out_expected = speex_bits_nbytes(&bits);
-				if (p + out_expected + 1 >=
+				if (p + out_expected + 1 >
 				    &outbuf[sizeof(outbuf) - 1])
 					break;
 				frame_len = (uint8_t *)p;
