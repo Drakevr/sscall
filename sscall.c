@@ -152,9 +152,11 @@ output_pcm(void *data)
 			p = pctx->buf;
 			while (1) {
 				frame_len = (uint8_t *)p;
-				if (!*frame_len)
+				if (!*frame_len) {
 					warnx("Invalid frame length: %hhu\n",
 					      *frame_len);
+					break;
+				}
 				if (p + 1 + *frame_len >
 				    pctx->buf + pctx->len - 1)
 					break;
