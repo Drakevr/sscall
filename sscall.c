@@ -532,6 +532,7 @@ main(int argc, char *argv[])
 	inp_pcm_priv.servinfo = p0;
 
 	set_nonblocking(inp_pcm_priv.fd);
+	set_nonblocking(inp_pcm_priv.sockfd);
 
 	ret = pthread_create(&input_pcm_thread, NULL,
 			     input_pcm, &input_pcm_state);
