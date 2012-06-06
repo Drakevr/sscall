@@ -371,7 +371,8 @@ init_speex(void)
 	/* Create a new encoder/decoder state in narrowband mode */
 	speex_enc_state = speex_encoder_init(&speex_nb_mode);
 	speex_dec_state = speex_decoder_init(&speex_nb_mode);
-	/* Set the quality to 8 (15 kbps) */
+	/* Set the quality to 8 (15 kbps), we should make
+	 * this configurable in the future */
 	tmp = 8;
 	speex_encoder_ctl(speex_enc_state, SPEEX_SET_QUALITY, &tmp);
 	/* Set the perceptual enhancement on */
