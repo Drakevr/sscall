@@ -1,7 +1,9 @@
 What is it?
 ===========
 
-A simple UDP based voice chat program.
+A simple UDP based voice chat program.  Currently
+we have support for libspeex.  There will be dtls support
+soon via CyaSSL as well.
 
 How to use it
 =============
