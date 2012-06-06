@@ -186,6 +186,8 @@ output_pcm(void *data)
 		pthread_mutex_unlock(&pcm_buf_lock);
 	} while (1);
 
+	speex_bits_destroy(&bits);
+
 	pthread_exit(NULL);
 
 	return NULL;
@@ -295,6 +297,8 @@ input_pcm(void *data)
 			usleep(UDELAY_SEND);
 		}
 	} while (1);
+
+	speex_bits_destroy(&bits);
 
 	pthread_exit(NULL);
 
@@ -589,6 +593,9 @@ main(int argc, char *argv[])
 
 	/* Wait for it */
 	pthread_join(output_pcm_thread, NULL);
+
+	speex_encoder_destroy(speex_enc_state);
+	speex_decoder_destroy(speex_dec_state);
 
 	ao_close(device);
 	ao_shutdown();
