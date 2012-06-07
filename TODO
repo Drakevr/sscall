@@ -3,6 +3,5 @@
 * Add encryption (dtls?)
 * Switch over to multiplexed I/O and get rid of threads
 * We'll need support for a config file
-* Use libsamplerate
 * Create a manpage
 * Update Makefile with an install target etc.
