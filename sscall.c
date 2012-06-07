@@ -101,6 +101,7 @@ static pthread_mutex_t input_pcm_state_lock;
 /* Set to 1 when SIGINT is received */
 static volatile int handle_sigint;
 
+/* This function is fixed to work with S16_LE only */
 static int
 src_downsample(char *inbuf, size_t inlen, char *outbuf,
 	       size_t outlen, size_t *actual_outlen)
