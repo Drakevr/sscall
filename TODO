@@ -5,3 +5,4 @@
 * We'll need support for a config file
 * Create a manpage
 * Update Makefile with an install target etc.
+* Do upsampling on the RX path.
