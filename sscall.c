@@ -20,6 +20,7 @@
 #include <ao/ao.h>
 #include <pthread.h>
 #include <speex/speex.h>
+#include <samplerate.h>
 
 #include "list.h"
 
@@ -41,6 +42,8 @@ static int fdevid;
 /* Command line option, verbosity flag */
 static int fverbose;
 
+/* Libsample rate state */
+SRC_STATE *src_state;
 /* Libspeex encoder state */
 void *speex_enc_state;
 /* Libspeex decoder state */
@@ -97,6 +100,62 @@ static pthread_mutex_t input_pcm_state_lock;
 
 /* Set to 1 when SIGINT is received */
 static volatile int handle_sigint;
+
+static int
+src_downsample(char *inbuf, size_t inlen, char *outbuf,
+	       size_t outlen, size_t *actual_outlen)
+{
+	float *in;
+	float *out;
+	short *input = (short *)inbuf;
+	short *output = (short *)outbuf;
+	long i;
+	SRC_DATA src_data;
+	long in_frame_size = (long)inlen / 2;
+	long out_frame_size = (long)outlen / 2;
+	int ret;
+	long outframes;
+
+	/* Allocate input, output buffers for
+	 * use by libsamplerate */
+	in = malloc(in_frame_size * sizeof(*in));
+	if (!in)
+		err(1, "malloc");
+
+	out = malloc(out_frame_size * sizeof(*out));
+	if (!out)
+		err(1, "malloc");
+
+	/* Convert short values into float values
+	 * so that libsamplerate can work on them */
+	for (i = 0; i < in_frame_size; i++)
+		in[i] = input[i];
+
+	for (i = 0; i < out_frame_size; i++)
+		out[i] = 0.f;
+
+	memset(&src_data, 0, sizeof(src_data));
+	src_data.data_in = in;
+	src_data.data_out = out;
+	src_data.input_frames = in_frame_size / fchan;
+	src_data.output_frames = out_frame_size / fchan;
+	src_data.src_ratio = 8000.0 / (double)frate;
+
+	ret = src_process(src_state, &src_data);
+	if (ret)
+		errx(1, "src_process failed: %s",
+		     src_strerror(ret));
+
+	outframes = src_data.output_frames_gen;
+	for (i = 0; i < outframes && i < (long)outlen / 2; i++)
+		output[i] = src_data.data_out[i];
+
+	*actual_outlen = i * 2;
+
+	src_reset(src_state);
+
+	return ret;
+}
 
 /* Play back audio from the client */
 static void *
@@ -226,9 +285,10 @@ input_pcm(void *data)
 {
 	struct input_pcm_state *state = data;
 	SpeexBits bits;
-	char inbuf[PCM_BUF_SIZE];
+	char inbuf[PCM_BUF_SIZE], downsampled_inbuf[PCM_BUF_SIZE];
 	char outbuf[COMPRESSED_BUF_SIZE];
 	ssize_t inbytes;
+	size_t downsampled_inbytes;
 	size_t outbytes;
 	char *p, *q;
 	short *in;
@@ -250,6 +310,15 @@ input_pcm(void *data)
 
 		inbytes = read(inp_pcm_priv.fd, inbuf, sizeof(inbuf));
 		if (inbytes > 0) {
+			/* Downsample from whatever input sample rate
+			 * to 8000kHz, S16_LE and 1 channel */
+			src_downsample(inbuf, inbytes,
+				       downsampled_inbuf,
+				       sizeof(downsampled_inbuf),
+				       &downsampled_inbytes);
+			memset(inbuf, 0, sizeof(inbuf));
+			memcpy(inbuf, downsampled_inbuf, downsampled_inbytes);
+
 			outbytes = 0;
 			/* Fixed to 16 bits for now */
 			nr_frames = (inbytes / 2) / speex_frame_size;
@@ -390,6 +459,17 @@ init_speex(void)
 			  &speex_frame_size);
 }
 
+static void
+init_samplerate(void)
+{
+	int error;
+
+	src_state = src_new(SRC_SINC_FASTEST, fchan, &error);
+	if (!src_state)
+		errx(1, "src_new failed: %s",
+		     src_strerror(error));
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -457,6 +537,7 @@ main(int argc, char *argv[])
 
 	init_ao(frate, fbits, fchan, &fdevid);
 	init_speex();
+	init_samplerate();
 
 	if (fverbose) {
 		printf("Bits per sample: %d\n", fbits);
@@ -598,6 +679,8 @@ main(int argc, char *argv[])
 
 	/* Wait for it */
 	pthread_join(output_pcm_thread, NULL);
+
+	src_delete(src_state);
 
 	speex_encoder_destroy(speex_enc_state);
 	speex_decoder_destroy(speex_dec_state);

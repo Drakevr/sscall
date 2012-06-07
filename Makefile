@@ -4,7 +4,7 @@ obj = sscall.o
 
 CC = gcc
 CFLAGS += -Wall -Wextra -I/usr/local/include
-LDFLAGS += -lao -lpthread -lspeex -L/usr/local/lib
+LDFLAGS += -lao -lpthread -lspeex -lsamplerate -L/usr/local/lib
 
 $(bin): $(obj)
 	$(CC) $(CFLAGS) -o $@ $(obj) $(LDFLAGS)
