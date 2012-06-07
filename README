@@ -5,6 +5,17 @@ A simple UDP based voice chat program.  Currently
 we have support for libspeex and libsamplerate.
 There will also be dtls support soon.
 
+Why?
+====
+
+We basically need something that works well on
+many UNIX flavours.  Skype is not really the answer
+to that.  We also want something simple so that
+we can build on top of it.
+
+The plan is to create another program called
+ssvideo for video streaming.
+
 How to use it
 =============
 
@@ -21,5 +32,5 @@ connect on port 4321 on the local machine.
 
 Note that if you use anything else other than 8000kHz
 input sample rate, then you need to run sscall with the
-appropriate arguments so that it can downsample
-appropriately.
+appropriate arguments so that it can downsample the
+stream.
