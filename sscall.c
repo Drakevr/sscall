@@ -319,6 +319,7 @@ input_pcm(void *data)
 				       &downsampled_inbytes);
 			memset(inbuf, 0, sizeof(inbuf));
 			memcpy(inbuf, downsampled_inbuf, downsampled_inbytes);
+			inbytes = downsampled_inbytes;
 
 			outbytes = 0;
 			/* Fixed to 16 bits for now */
