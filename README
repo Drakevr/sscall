@@ -18,3 +18,8 @@ For e.g. on OpenBSD:
 This will stream your voice to machine 192.168.1.2
 on port 1234.  Similarly on the other side you can
 connect on port 4321 on the local machine.
+
+Note that if you use anything else other than 8000kHz
+input sample rate, then you need to run sscall with the
+appropriate arguments so that it can downsample
+appropriately.
