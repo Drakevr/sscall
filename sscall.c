@@ -41,8 +41,9 @@ static int fdevid;
 /* Command line option, verbosity flag */
 static int fverbose;
 
-/* Libspeex state */
+/* Libspeex encoder state */
 void *speex_enc_state;
+/* Libspeex decoder state */
 void *speex_dec_state;
 /* Desired frame size, queried at run-time */
 static int speex_frame_size;
