@@ -344,7 +344,7 @@ set_nonblocking(int fd)
 }
 
 static void
-init_libao(int rate, int bits, int chans,
+init_ao(int rate, int bits, int chans,
 	   int *devid)
 {
 	ao_sample_format format;
@@ -451,7 +451,7 @@ main(int argc, char *argv[])
 	if (!frate)
 		frate = 8000;
 
-	init_libao(frate, fbits, fchan, &fdevid);
+	init_ao(frate, fbits, fchan, &fdevid);
 	init_speex();
 
 	if (fverbose) {
