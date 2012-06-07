@@ -448,6 +448,9 @@ main(int argc, char *argv[])
 
 	if (!fchan)
 		fchan = 1;
+	else if (fchan != 1)
+		errx(1, "Unsupported number of channels: %d",
+		     fchan);
 
 	if (!frate)
 		frate = 8000;
