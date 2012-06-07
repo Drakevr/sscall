@@ -155,6 +155,9 @@ src_downsample(char *inbuf, size_t inlen, char *outbuf,
 
 	src_reset(src_state);
 
+	free(in);
+	free(out);
+
 	return ret;
 }
 
