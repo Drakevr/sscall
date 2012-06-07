@@ -6,3 +6,4 @@
 * Create a manpage
 * Update Makefile with an install target etc.
 * Do upsampling on the RX path.
+* On the fly enable/disable verbose mode (SIGUSR1)
