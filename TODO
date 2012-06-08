@@ -5,4 +5,3 @@
 * We'll need support for a config file
 * Create a manpage
 * Update Makefile with an install target etc.
-* On the fly enable/disable verbose mode (SIGUSR1)

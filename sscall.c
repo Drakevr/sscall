@@ -480,6 +480,9 @@ sig_handler(int signum)
 	case SIGINT:
 		handle_sigint = 1;
 		break;
+	case SIGUSR1:
+		fverbose = !fverbose;
+		break;
 	default:
 		break;
 	}
@@ -712,6 +715,9 @@ main(int argc, char *argv[])
 		err(1, "pthread_create");
 
 	if (signal(SIGINT, sig_handler) == SIG_ERR)
+		err(1, "signal");
+
+	if (signal(SIGUSR1, sig_handler) == SIG_ERR)
 		err(1, "signal");
 
 	/* Receive audio data from other end and prepare
