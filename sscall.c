@@ -98,6 +98,9 @@ static pthread_mutex_t output_pcm_state_lock;
 /* Lock that protects input_pcm_state */
 static pthread_mutex_t input_pcm_state_lock;
 
+/* Lock that protects the src_state */
+static pthread_mutex_t src_state_lock;
+
 /* Set to 1 when SIGINT is received */
 static volatile int handle_sigint;
 
@@ -142,10 +145,13 @@ src_downsample(char *inbuf, size_t inlen, char *outbuf,
 	src_data.output_frames = out_frame_size / fchan;
 	src_data.src_ratio = 8000.0 / (double)frate;
 
+	pthread_mutex_lock(&src_state_lock);
 	ret = src_process(src_state, &src_data);
-	if (ret)
+	if (ret) {
+		pthread_mutex_unlock(&src_state_lock);
 		errx(1, "src_process failed: %s",
 		     src_strerror(ret));
+	}
 
 	outframes = src_data.output_frames_gen;
 	for (i = 0; i < outframes && i < (long)outlen / 2; i++)
@@ -154,6 +160,7 @@ src_downsample(char *inbuf, size_t inlen, char *outbuf,
 	*actual_outlen = i * 2;
 
 	src_reset(src_state);
+	pthread_mutex_unlock(&src_state_lock);
 
 	free(in);
 	free(out);
@@ -202,10 +209,13 @@ src_upsample(char *inbuf, size_t inlen, char *outbuf,
 	src_data.output_frames = out_frame_size / fchan;
 	src_data.src_ratio = (double)frate / 8000.0;
 
+	pthread_mutex_lock(&src_state_lock);
 	ret = src_process(src_state, &src_data);
-	if (ret)
+	if (ret) {
+		pthread_mutex_unlock(&src_state_lock);
 		errx(1, "src_process failed: %s",
 		     src_strerror(ret));
+	}
 
 	outframes = src_data.output_frames_gen;
 	for (i = 0; i < outframes && i < (long)outlen / 2; i++)
@@ -214,6 +224,7 @@ src_upsample(char *inbuf, size_t inlen, char *outbuf,
 	*actual_outlen = i * 2;
 
 	src_reset(src_state);
+	pthread_mutex_unlock(&src_state_lock);
 
 	free(in);
 	free(out);
@@ -680,6 +691,8 @@ main(int argc, char *argv[])
 
 	pthread_mutex_init(&output_pcm_state_lock, NULL);
 	pthread_mutex_init(&input_pcm_state_lock, NULL);
+
+	pthread_mutex_init(&src_state_lock, NULL);
 
 	ret = pthread_create(&output_pcm_thread, NULL,
 			     output_pcm, &output_pcm_state);
