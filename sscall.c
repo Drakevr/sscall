@@ -161,6 +161,66 @@ src_downsample(char *inbuf, size_t inlen, char *outbuf,
 	return ret;
 }
 
+/* This function is fixed to work with S16_LE only */
+static int
+src_upsample(char *inbuf, size_t inlen, char *outbuf,
+	     size_t outlen, size_t *actual_outlen)
+{
+	float *in;
+	float *out;
+	short *input = (short *)inbuf;
+	short *output = (short *)outbuf;
+	long i;
+	SRC_DATA src_data;
+	long in_frame_size = (long)inlen / 2;
+	long out_frame_size = (long)outlen / 2;
+	int ret;
+	long outframes;
+
+	/* Allocate input, output buffers for
+	 * use by libsamplerate */
+	in = malloc(in_frame_size * sizeof(*in));
+	if (!in)
+		err(1, "malloc");
+
+	out = malloc(out_frame_size * sizeof(*out));
+	if (!out)
+		err(1, "malloc");
+
+	/* Convert short values into float values
+	 * so that libsamplerate can work on them */
+	for (i = 0; i < in_frame_size; i++)
+		in[i] = input[i];
+
+	for (i = 0; i < out_frame_size; i++)
+		out[i] = 0.f;
+
+	memset(&src_data, 0, sizeof(src_data));
+	src_data.data_in = in;
+	src_data.data_out = out;
+	src_data.input_frames = in_frame_size / fchan;
+	src_data.output_frames = out_frame_size / fchan;
+	src_data.src_ratio = (double)frate / 8000.0;
+
+	ret = src_process(src_state, &src_data);
+	if (ret)
+		errx(1, "src_process failed: %s",
+		     src_strerror(ret));
+
+	outframes = src_data.output_frames_gen;
+	for (i = 0; i < outframes && i < (long)outlen / 2; i++)
+		output[i] = src_data.data_out[i];
+
+	*actual_outlen = i * 2;
+
+	src_reset(src_state);
+
+	free(in);
+	free(out);
+
+	return ret;
+}
+
 /* Play back audio from the client */
 static void *
 output_pcm(void *data)
@@ -175,6 +235,8 @@ output_pcm(void *data)
 	short *out;
 	uint8_t *frame_len;
 	char *p;
+	char upsampled_pcm[PCM_BUF_SIZE];
+	size_t upsampled_bytes;
 
 	speex_bits_init(&bits);
 	do {
@@ -236,9 +298,16 @@ output_pcm(void *data)
 				/* Decode it */
 				speex_decode_int(speex_dec_state, &bits,
 						 out);
+
+				memset(upsampled_pcm, 0, sizeof(upsampled_pcm));
+				/* Upsample the stream */
+				src_upsample((char *)out, speex_frame_size * sizeof(*out),
+					     upsampled_pcm, sizeof(upsampled_pcm),
+					     &upsampled_bytes);
+
 				/* Play it! */
-				ao_play(device, (char *)out,
-					speex_frame_size * sizeof(*out));
+				ao_play(device, upsampled_pcm,
+					upsampled_bytes);
 				/* Each frame is approximately 20ms */
 				usleep(20);
 			}
