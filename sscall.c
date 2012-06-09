@@ -530,18 +530,18 @@ init_ao(int rate, int bits, int chans,
 static void
 init_speex(void)
 {
-	int tmp;
+	int quality, opts;
 
 	/* Create a new encoder/decoder state in narrowband mode */
 	speex_enc_state = speex_encoder_init(&speex_nb_mode);
 	speex_dec_state = speex_decoder_init(&speex_nb_mode);
 	/* Set the quality to 8 (15 kbps), we should make
 	 * this configurable in the future */
-	tmp = 8;
-	speex_encoder_ctl(speex_enc_state, SPEEX_SET_QUALITY, &tmp);
+	quality = 8;
+	speex_encoder_ctl(speex_enc_state, SPEEX_SET_QUALITY, &quality);
 	/* Set the perceptual enhancement on */
-	tmp = 1;
-	speex_decoder_ctl(speex_dec_state, SPEEX_SET_ENH, &tmp);
+	opts = 1;
+	speex_decoder_ctl(speex_dec_state, SPEEX_SET_ENH, &opts);
 	/* Retrieve the preferred frame size */
 	speex_encoder_ctl(speex_enc_state, SPEEX_GET_FRAME_SIZE,
 			  &speex_frame_size);
