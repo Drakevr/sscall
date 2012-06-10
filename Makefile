@@ -29,6 +29,7 @@ install:
 	chmod 755 $(dst)/bin/$(bin)
 	mkdir -p $(mandst)
 	cp -f man/man1/sscall.1 $(mandst)
+	chmod 644 $(mandst)/sscall.1
 
 uninstall:
 	rm -f $(dst)/bin/$(bin)
