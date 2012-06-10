@@ -6,3 +6,4 @@
 * A server side so we can do neat things (working over NAT etc.)
 * Add IPv6 support
 * ARM port for Linux - should just work?
+* Use connected UDP sockets
