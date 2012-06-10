@@ -3,7 +3,6 @@
 * Add encryption (dtls?)
 * Switch over to multiplexed I/O and get rid of threads
 * We'll need support for a config file
-* Create a manpage
 * A server side so we can do neat things (working over NAT etc.)
 * Add IPv6 support
 * ARM port for Linux - should just work?
