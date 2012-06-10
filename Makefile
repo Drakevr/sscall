@@ -28,11 +28,12 @@ install:
 	cp -f $(bin) $(dst)/bin
 	chmod 755 $(dst)/bin/$(bin)
 	mkdir -p $(mandst)
-	cp -f man/man1/sscall.1 $(mandst)
-	chmod 644 $(mandst)/sscall.1
+	gzip -c man/man1/sscall.1 > man/man1/sscall.1.gz
+	cp -f man/man1/sscall.1.gz $(mandst)
+	chmod 644 $(mandst)/sscall.1.gz
 
 uninstall:
 	rm -f $(dst)/bin/$(bin)
-	rm -f $(mandst)/sscall.1
+	rm -f $(mandst)/sscall.1.gz
 
 .PHONY: all clean
