@@ -104,10 +104,17 @@ static pthread_mutex_t src_state_lock;
 /* Set to 1 when SIGINT is received */
 static volatile int handle_sigint;
 
+/* libsamplerate downsample/upsample operations */
+enum src_action {
+	SRC_DOWNSAMPLE,
+	SRC_UPSAMPLE
+};
+
 /* This function is fixed to work with S16_LE only */
 static int
-src_downsample(char *inbuf, size_t inlen, char *outbuf,
-	       size_t outlen, size_t *actual_outlen)
+src_convert(char *inbuf, size_t inlen, char *outbuf,
+	    size_t outlen, size_t *actual_outlen,
+	    enum src_action src_action)
 {
 	float *in;
 	float *out;
@@ -143,71 +150,15 @@ src_downsample(char *inbuf, size_t inlen, char *outbuf,
 	src_data.data_out = out;
 	src_data.input_frames = in_frame_size / fchan;
 	src_data.output_frames = out_frame_size / fchan;
-	src_data.src_ratio = 8000.0 / (double)frate;
-
-	pthread_mutex_lock(&src_state_lock);
-	ret = src_process(src_state, &src_data);
-	if (ret) {
-		pthread_mutex_unlock(&src_state_lock);
-		errx(1, "src_process failed: %s",
-		     src_strerror(ret));
+	if (src_action == SRC_DOWNSAMPLE)
+		src_data.src_ratio = 8000.0 / (double)frate;
+	else if (src_action == SRC_UPSAMPLE)
+		src_data.src_ratio = (double)frate / 8000.0;
+	else {
+		free(in);
+		free(out);
+		return -EINVAL;
 	}
-
-	outframes = src_data.output_frames_gen;
-	for (i = 0; i < outframes && i < (long)outlen / 2; i++)
-		output[i] = src_data.data_out[i];
-
-	*actual_outlen = i * 2;
-
-	src_reset(src_state);
-	pthread_mutex_unlock(&src_state_lock);
-
-	free(in);
-	free(out);
-
-	return ret;
-}
-
-/* This function is fixed to work with S16_LE only */
-static int
-src_upsample(char *inbuf, size_t inlen, char *outbuf,
-	     size_t outlen, size_t *actual_outlen)
-{
-	float *in;
-	float *out;
-	short *input = (short *)inbuf;
-	short *output = (short *)outbuf;
-	long i;
-	SRC_DATA src_data;
-	long in_frame_size = (long)inlen / 2;
-	long out_frame_size = (long)outlen / 2;
-	int ret;
-	long outframes;
-
-	/* Allocate input, output buffers for
-	 * use by libsamplerate */
-	in = malloc(in_frame_size * sizeof(*in));
-	if (!in)
-		err(1, "malloc");
-
-	out = malloc(out_frame_size * sizeof(*out));
-	if (!out)
-		err(1, "malloc");
-
-	/* Convert short values into float values
-	 * so that libsamplerate can work on them */
-	for (i = 0; i < in_frame_size; i++)
-		in[i] = input[i];
-
-	for (i = 0; i < out_frame_size; i++)
-		out[i] = 0.f;
-
-	memset(&src_data, 0, sizeof(src_data));
-	src_data.data_in = in;
-	src_data.data_out = out;
-	src_data.input_frames = in_frame_size / fchan;
-	src_data.output_frames = out_frame_size / fchan;
-	src_data.src_ratio = (double)frate / 8000.0;
 
 	pthread_mutex_lock(&src_state_lock);
 	ret = src_process(src_state, &src_data);
@@ -312,9 +263,9 @@ output_pcm(void *data)
 
 				memset(upsampled_pcm, 0, sizeof(upsampled_pcm));
 				/* Upsample the stream */
-				src_upsample((char *)out, speex_frame_size * sizeof(*out),
-					     upsampled_pcm, sizeof(upsampled_pcm),
-					     &upsampled_bytes);
+				src_convert((char *)out, speex_frame_size * sizeof(*out),
+					    upsampled_pcm, sizeof(upsampled_pcm),
+					    &upsampled_bytes, SRC_UPSAMPLE);
 
 				/* Play it! */
 				ao_play(device, upsampled_pcm,
@@ -396,10 +347,11 @@ input_pcm(void *data)
 		if (inbytes > 0) {
 			/* Downsample from whatever input sample rate
 			 * to 8000kHz, S16_LE and 1 channel */
-			src_downsample(inbuf, inbytes,
-				       downsampled_inbuf,
-				       sizeof(downsampled_inbuf),
-				       &downsampled_inbytes);
+			src_convert(inbuf, inbytes,
+				    downsampled_inbuf,
+				    sizeof(downsampled_inbuf),
+				    &downsampled_inbytes,
+				    SRC_DOWNSAMPLE);
 			memset(inbuf, 0, sizeof(inbuf));
 			memcpy(inbuf, downsampled_inbuf, downsampled_inbytes);
 			inbytes = downsampled_inbytes;
