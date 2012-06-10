@@ -160,6 +160,9 @@ src_convert(char *inbuf, size_t inlen, char *outbuf,
 		return -EINVAL;
 	}
 
+	/* TODO: src_process() can return a partially
+	 * filled output buffer, ensure we handle this
+	 * in the future */
 	pthread_mutex_lock(&src_state_lock);
 	ret = src_process(src_state, &src_data);
 	if (ret) {
@@ -169,6 +172,9 @@ src_convert(char *inbuf, size_t inlen, char *outbuf,
 	}
 	src_reset(src_state);
 	pthread_mutex_unlock(&src_state_lock);
+
+	if (src_data.input_frames_used != src_data.input_frames)
+		warnx("Did not convert entire input buffer");
 
 	outframes = src_data.output_frames_gen;
 	for (i = 0; i < outframes && i < (long)outlen / 2; i++)
