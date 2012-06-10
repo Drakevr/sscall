@@ -1,3 +1,4 @@
+/* Stripped list.h header, taken from the Linux kernel sources */
 #ifndef _LIST_H
 #define _LIST_H
 
