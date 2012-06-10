@@ -167,15 +167,14 @@ src_convert(char *inbuf, size_t inlen, char *outbuf,
 		errx(1, "src_process failed: %s",
 		     src_strerror(ret));
 	}
+	src_reset(src_state);
+	pthread_mutex_unlock(&src_state_lock);
 
 	outframes = src_data.output_frames_gen;
 	for (i = 0; i < outframes && i < (long)outlen / 2; i++)
 		output[i] = src_data.data_out[i];
 
 	*actual_outlen = i * 2;
-
-	src_reset(src_state);
-	pthread_mutex_unlock(&src_state_lock);
 
 	free(in);
 	free(out);
