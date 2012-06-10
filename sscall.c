@@ -25,7 +25,7 @@
 #include "list.h"
 
 /* Input/Output PCM buffer size */
-#define PCM_BUF_SIZE (8000)
+#define PCM_BUF_SIZE (16000)
 /* Input/Output compressed buffer size */
 #define COMPRESSED_BUF_SIZE (640)
 /* Sleep at least 50ms between each sendto() call */
