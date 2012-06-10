@@ -4,6 +4,8 @@ obj = sscall.o
 
 DESTDIR ?=
 PREFIX ?= /usr
+MANDIR ?= /usr/man/man1
+mandst = ${DESTDIR}${MANDIR}
 dst = ${DESTDIR}${PREFIX}
 
 CC = gcc
@@ -25,6 +27,8 @@ all:
 install:
 	cp -f $(bin) $(dst)/bin
 	chmod 755 $(dst)/bin/$(bin)
+	gzip man/man1/sscall.1
+	mv man/man1/sscall.1.gz $(mandst)
 
 uninstall:
 	rm -f $(dst)/bin/$(bin)
