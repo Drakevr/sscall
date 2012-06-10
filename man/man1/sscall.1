@@ -1,0 +1,50 @@
+.\" sscall Manpage.
+.TH SSCALL "1" "June 2012" "Voice Chatting utility" "#2f30"
+.SH NAME
+sscall \- "Voice chat with your friends"
+.SH SYNOPSIS
+.B my-rec.sh | sscall
+[\fIOPTIONS\fR] [\fIRemote IP\fR] [\fIRemote Port\fR] [\fILocal Port\fR]
+.SH DESCRIPTION
+.PP
+This will stream your voice to the "Remote IP"
+on the "Remote Port".  Similarly on the other
+side you can connect on "Local Port" on the local machine.
+Note that if you use anything else other than an 8kHz
+input sample rate, then you need to run \fIsscall\fR with the
+appropriate arguments so that it can downsample the
+stream.
+Similarly on the receive path if you use anything else
+other than 8kHz, then \fIsscall\fR will upsample to that sample
+rate.
+These options are generally useful if your system does
+not support certain input/output sample rates.
+.PP
+Supplementary arguments include:
+.TP
+\fB\-b\fR
+Bits per sample.
+.TP
+\fB\-r\fR
+Samples per second (in a single channel).
+.TP
+\fB\-c\fR
+Number of channels.
+.TP
+\fB\-d\fR
+Override default driver ID.
+.TP
+\fB\-v\fR
+Enable verbose output.
+.TP
+\fB\-h\fR
+Print the help screen.
+.SH AUTHOR
+Written by Dimitris Papastamos(quantumdream).
+.SH ACKNOWLEDGEMENTS
+The people behind 2f30.org have been very helpful and their
+ideas have been much appreciated.
+.SH COPYRIGHT
+Copyright \(co 2012 quantumdream.
+.br
+This is free software distributed under MIT/X Consortium License.
