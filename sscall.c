@@ -150,6 +150,8 @@ src_convert(char *inbuf, size_t inlen, char *outbuf,
 	src_data.data_out = out;
 	src_data.input_frames = in_frame_size / fchan;
 	src_data.output_frames = out_frame_size / fchan;
+	/* Last and only buffer */
+	src_data.end_of_input = 1;
 	if (src_action == SRC_DOWNSAMPLE)
 		src_data.src_ratio = 8000.0 / (double)frate;
 	else if (src_action == SRC_UPSAMPLE)
