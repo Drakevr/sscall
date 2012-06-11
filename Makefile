@@ -21,7 +21,7 @@ $(BIN): ${OBJ}
 	${CC} ${CFLAGS} ${LDFLAGS} -o $@ ${OBJ}
 
 %.o: %.c
-	${CC} ${CFLAGS} -c -o $@ $<
+	${CC} ${CFLAGS} -DVERSION=\"${VER}\" -c -o $@ $<
 
 clean:
 	@rm -rf ${BIN} ${OBJ}

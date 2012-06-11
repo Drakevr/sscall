@@ -429,6 +429,7 @@ usage(const char *s)
 	fprintf(stderr, " -c\tNumber of channels\n");
 	fprintf(stderr, " -d\tOverride default driver ID\n");
 	fprintf(stderr, " -v\tEnable verbose output\n");
+	fprintf(stderr, " -V\tPrint version information\n");
 	fprintf(stderr, " -h\tThis help screen\n");
 }
 
@@ -536,7 +537,7 @@ main(int argc, char *argv[])
 	int optval;
 
 	prog = *argv;
-	while ((c = getopt(argc, argv, "hb:c:r:d:v")) != -1) {
+	while ((c = getopt(argc, argv, "hb:c:r:d:vV")) != -1) {
 		switch (c) {
 		case 'h':
 			usage(prog);
@@ -557,6 +558,9 @@ main(int argc, char *argv[])
 		case 'v':
 			fverbose = 1;
 			break;
+		case 'V':
+			printf("%s\n", VERSION);
+			exit(0);
 		case '?':
 		default:
 			exit(1);
