@@ -13,7 +13,7 @@ CC = gcc
 INCS = -I/usr/local/include
 LIBS = -L/usr/local/lib
 
-CFLAGS += -Wall -Wextra ${INCS}
+CFLAGS += -Wall -Wextra -DVERSION=\"${VER}\" ${INCS}
 # Add -lsocket if you are building on Solaris
 LDFLAGS += -lao -lpthread -lspeex -lsamplerate ${LIBS}
 
@@ -21,7 +21,7 @@ $(BIN): ${OBJ}
 	${CC} ${CFLAGS} ${LDFLAGS} -o $@ ${OBJ}
 
 %.o: %.c
-	${CC} ${CFLAGS} -DVERSION=\"${VER}\" -c -o $@ $<
+	${CC} ${CFLAGS} -c -o $@ $<
 
 clean:
 	@rm -rf ${BIN} ${OBJ}
