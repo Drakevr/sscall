@@ -7,3 +7,4 @@
 * Add IPv6 support
 * ARM port for Linux - should just work?
 * Use connected UDP sockets
+* What about a DCCP based fork of sscall?
