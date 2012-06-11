@@ -36,4 +36,4 @@ uninstall:
 	rm -f $(dst)/bin/$(bin)
 	rm -f $(mandst)/sscall.1.gz
 
-.PHONY: all clean
+.PHONY: all clean install uninstall
