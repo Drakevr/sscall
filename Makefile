@@ -9,8 +9,7 @@ MANDST = ${PREFIX}${MANDIR}
 
 CC = gcc
 
-# These might need updating, depending on your
-# system.
+# These might need updating, depending on your system
 INCS = -I/usr/local/include
 LIBS = -L/usr/local/lib
 
