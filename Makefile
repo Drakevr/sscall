@@ -1,39 +1,44 @@
-bin = sscall
-ver = 0.1
-obj = sscall.o
+BIN = sscall
+VER = 0.1
+SRC = sscall.c
+OBJ = ${SRC:.c=.o}
 
-DESTDIR ?=
-PREFIX ?= /usr
-MANDIR ?= /usr/man/man1
-mandst = ${DESTDIR}${MANDIR}
-dst = ${DESTDIR}${PREFIX}
+PREFIX = /usr
+MANDIR = /man/man1
+MANDST = ${PREFIX}${MANDIR}
 
 CC = gcc
-CFLAGS += -Wall -Wextra -I/usr/local/include
-LDFLAGS += -lao -lpthread -lspeex -lsamplerate -L/usr/local/lib
 
-$(bin): $(obj)
-	$(CC) $(CFLAGS) -o $@ $(obj) $(LDFLAGS)
+# These might need updating, depending on your
+# system.
+INCS = -I/usr/local/include
+LIBS = -L/usr/local/lib
+
+CFLAGS += -Wall -Wextra
+LDFLAGS += -lao -lpthread -lspeex -lsamplerate
+
+$(BIN): ${OBJ}
+	${CC} ${CFLAGS} -o $@ ${OBJ} ${LDFLAGS} ${LIBS}
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	${CC} ${CFLAGS} ${INCS} -c -o $@ $<
 
 clean:
-	@rm -rf $(bin) $(obj)
+	@rm -rf ${BIN} ${OBJ}
 
 all:
-	make
+	sscall
 
 install:
-	cp -f $(bin) $(dst)/bin
-	chmod 755 $(dst)/bin/$(bin)
-	mkdir -p $(mandst)
+	cp -f ${BIN} ${PREFIX}/bin
+	chmod 755 ${PREFIX}/bin/${BIN}
+	mkdir -p ${MANDST}
 	gzip -c man/man1/sscall.1 > man/man1/sscall.1.gz
-	mv -f man/man1/sscall.1.gz $(mandst)
-	chmod 644 $(mandst)/sscall.1.gz
+	mv -f man/man1/sscall.1.gz ${MANDST}
+	chmod 644 ${MANDST}/sscall.1.gz
 
 uninstall:
-	rm -f $(dst)/bin/$(bin)
-	rm -f $(mandst)/sscall.1.gz
+	rm -f ${PREFIX}/bin/${BIN}
+	rm -f ${MANDST}/sscall.1.gz
 
 .PHONY: all clean install uninstall
