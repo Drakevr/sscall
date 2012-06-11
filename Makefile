@@ -1,5 +1,5 @@
 BIN = sscall
-VER = 0.1
+VER = 0.2-rc1
 SRC = sscall.c
 OBJ = ${SRC:.c=.o}
 
