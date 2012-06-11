@@ -16,6 +16,13 @@ we can build on top of it.
 The plan is to create another program called
 ssvideo for video streaming.
 
+How to build
+============
+
+Simply `make' followed by a `make install'.  If you
+are building with an unusual configuration please
+check the Makefile and the comments for what to do.
+
 How to use it
 =============
 
