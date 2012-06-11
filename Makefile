@@ -14,14 +14,14 @@ CC = gcc
 INCS = -I/usr/local/include
 LIBS = -L/usr/local/lib
 
-CFLAGS += -Wall -Wextra
-LDFLAGS += -lao -lpthread -lspeex -lsamplerate
+CFLAGS += -Wall -Wextra ${INCS}
+LDFLAGS += -lao -lpthread -lspeex -lsamplerate ${LIBS}
 
 $(BIN): ${OBJ}
-	${CC} ${CFLAGS} -o $@ ${OBJ} ${LDFLAGS} ${LIBS}
+	${CC} ${CFLAGS} -o $@ ${OBJ} ${LDFLAGS}
 
 %.o: %.c
-	${CC} ${CFLAGS} ${INCS} -c -o $@ $<
+	${CC} ${CFLAGS} -c -o $@ $<
 
 clean:
 	@rm -rf ${BIN} ${OBJ}
