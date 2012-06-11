@@ -19,7 +19,7 @@ CFLAGS += -Wall -Wextra ${INCS}
 LDFLAGS += -lao -lpthread -lspeex -lsamplerate ${LIBS}
 
 $(BIN): ${OBJ}
-	${CC} ${CFLAGS} -o $@ ${OBJ} ${LDFLAGS}
+	${CC} ${CFLAGS} ${LDFLAGS} -o $@ ${OBJ}
 
 %.o: %.c
 	${CC} ${CFLAGS} -c -o $@ $<
