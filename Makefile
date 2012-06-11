@@ -15,6 +15,7 @@ INCS = -I/usr/local/include
 LIBS = -L/usr/local/lib
 
 CFLAGS += -Wall -Wextra ${INCS}
+# Add -lsocket if you are building on Solaris
 LDFLAGS += -lao -lpthread -lspeex -lsamplerate ${LIBS}
 
 $(BIN): ${OBJ}

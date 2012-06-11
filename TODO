@@ -8,4 +8,3 @@
 * ARM port for Linux - should just work?
 * Use connected UDP sockets
 * What about a DCCP based fork of sscall?
-* Add -lsocket in LDFLAGS for Solaris
