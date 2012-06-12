@@ -24,10 +24,10 @@ $(BIN): ${OBJ}
 	${CC} ${CFLAGS} -c -o $@ $<
 
 clean:
-	@rm -rf ${BIN} ${OBJ}
+	rm -rf ${BIN} ${OBJ}
+	rm -f sscall-${VER}.tar.gz
 
-all:
-	sscall
+all: sscall
 
 install:
 	cp -f ${BIN} ${PREFIX}/bin
@@ -41,4 +41,13 @@ uninstall:
 	rm -f ${PREFIX}/bin/${BIN}
 	rm -f ${MANDST}/sscall.1.gz
 
-.PHONY: all clean install uninstall
+dist: clean
+	mkdir -p sscall-${VER}
+	cp -R CONTRIBUTORS LICENSE linux list.h Makefile \
+		man obsd README sscall.c sscall.h test-files \
+		TODO sscall-${VER}
+	tar -cf sscall-${VER}.tar sscall-${VER}
+	gzip sscall-${VER}.tar
+	rm -rf sscall-${VER}
+
+.PHONY: all clean install uninstall dist
