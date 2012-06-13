@@ -9,3 +9,4 @@
 * Use connected UDP sockets
 * What about a DCCP based fork of sscall?
 * Probe for supported output sample rates
+* Fix high CPU usage issue
