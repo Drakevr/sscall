@@ -30,6 +30,8 @@
 #define COMPRESSED_BUF_SIZE (640)
 /* Sleep at least 50ms between each sendto() call */
 #define UDELAY_SEND (50 * 1000)
+/* Fallback thread scheduling priority */
+#define FALLBACK_PRIO 40
 
 /* Command line option, bits per sample */
 static int fbits;
@@ -219,6 +221,21 @@ output_pcm(void *data)
 	char upsampled_pcm[PCM_BUF_SIZE];
 	size_t upsampled_bytes;
 	int ret;
+	pthread_attr_t tattr;
+	int prio;
+	struct sched_param param;
+
+	prio = sched_get_priority_min(SCHED_FIFO);
+	if (prio < 0)
+		prio = FALLBACK_PRIO;
+	memset(&param, 0, sizeof(param));
+	param.sched_priority = prio;
+
+	ret = pthread_attr_setschedparam(&tattr, &param);
+	if (ret < 0) {
+		errno = ret;
+		err(1, "phtread_attr_setschedparam");
+	}
 
 	speex_bits_init(&bits);
 	do {
@@ -358,6 +375,22 @@ input_pcm(void *data)
 	uint8_t *frame_len;
 	ssize_t i;
 	ssize_t ret;
+
+	pthread_attr_t tattr;
+	int prio;
+	struct sched_param param;
+
+	prio = sched_get_priority_min(SCHED_FIFO);
+	if (prio < 0)
+		prio = FALLBACK_PRIO;
+	memset(&param, 0, sizeof(param));
+	param.sched_priority = prio;
+
+	ret = pthread_attr_setschedparam(&tattr, &param);
+	if (ret < 0) {
+		errno = ret;
+		err(1, "phtread_attr_setschedparam");
+	}
 
 	speex_bits_init(&bits);
 	do {
