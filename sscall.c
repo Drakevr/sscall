@@ -206,6 +206,7 @@ output_pcm(void *data)
 	char *p;
 	char upsampled_pcm[PCM_BUF_SIZE];
 	size_t upsampled_bytes;
+	int ret;
 
 	speex_bits_init(&bits);
 	do {
@@ -264,15 +265,20 @@ output_pcm(void *data)
 				/* Ensure output buffer is zero-filled */
 				memset(out, 0,
 				       speex_frame_size * sizeof(*out));
-				/* Decode it */
-				speex_decode_int(speex_dec_state, &bits,
-						 out);
-
+				/* Zero-fill playback buffer in case we have a
+				 * decode error */
 				memset(upsampled_pcm, 0, sizeof(upsampled_pcm));
-				/* Upsample the stream */
-				src_convert((char *)out, speex_frame_size * sizeof(*out),
-					    upsampled_pcm, sizeof(upsampled_pcm),
-					    &upsampled_bytes, SRC_UPSAMPLE);
+				upsampled_bytes = sizeof(upsampled_pcm);
+				/* Decode it */
+				ret = speex_decode_int(speex_dec_state, &bits,
+						       out);
+				if (!ret)
+					/* Upsample the stream */
+					src_convert((char *)out, speex_frame_size * sizeof(*out),
+						    upsampled_pcm, sizeof(upsampled_pcm),
+						    &upsampled_bytes, SRC_UPSAMPLE);
+				else
+					warnx("speex_decode_int failed: %d", ret);
 
 				/* Play it! */
 				ao_play(device, upsampled_pcm,
