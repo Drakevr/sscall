@@ -127,6 +127,18 @@ src_convert(char *inbuf, size_t inlen, char *outbuf,
 	int ret;
 	long outframes;
 
+	/* We don't need to sample convert
+	 * if the chosen sample rate is 8kHz */
+	if (frate == 8000) {
+		*actual_outlen = inlen;
+		if (outlen < inlen) {
+			*actual_outlen = outlen;
+			warnx("Truncating output buffer");
+		}
+		memcpy(outbuf, inbuf, *actual_outlen);
+		return 0;
+	}
+
 	/* Allocate input, output buffers for
 	 * use by libsamplerate */
 	in = malloc(in_frame_size * sizeof(*in));
