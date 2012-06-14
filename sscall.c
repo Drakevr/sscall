@@ -61,13 +61,13 @@ static pthread_t capture_thread;
 
 /* Shared buf between do_playback()
  * and playback thread */
-struct pcm_buf {
-	/* PCM buffer */
+struct compressed_buf {
+	/* Compressed buffer */
 	char *buf;
-	/* PCM buffer size */
+	/* Compressed buffer size */
 	size_t len;
 	struct list_head list;
-} pcm_buf;
+} compressed_buf;
 
 /* Private structure for the
  * capture thread */
@@ -80,8 +80,8 @@ struct capture_priv {
 	struct addrinfo *servinfo;
 } capture_priv;
 
-/* Lock that protects pcm_buf */
-static pthread_mutex_t pcm_buf_lock;
+/* Lock that protects compressed_buf */
+static pthread_mutex_t compressed_buf_lock;
 /* Condition variable on which ao_play() blocks */
 static pthread_cond_t tx_pcm_cond;
 
@@ -208,7 +208,7 @@ src_convert(char *inbuf, size_t inlen, char *outbuf,
 static void *
 playback(void *data)
 {
-	struct pcm_buf *pctx;
+	struct compressed_buf *cbuf;
 	struct list_head *iter, *q;
 	struct playback_state *state = data;
 	struct timespec ts;
@@ -239,7 +239,7 @@ playback(void *data)
 
 	speex_bits_init(&bits);
 	do {
-		pthread_mutex_lock(&pcm_buf_lock);
+		pthread_mutex_lock(&compressed_buf_lock);
 		gettimeofday(&tp, NULL);
 		/* Convert from timeval to timespec */
 		ts.tv_sec = tp.tv_sec;
@@ -247,11 +247,11 @@ playback(void *data)
 		/* Default to a 3 second wait internal */
 		ts.tv_sec += 3;
 
-		if (list_empty(&pcm_buf.list)) {
+		if (list_empty(&compressed_buf.list)) {
 			/* Wait in the worst case 3 seconds to give some
 			 * grace to perform cleanup if necessary */
 			rc = pthread_cond_timedwait(&tx_pcm_cond,
-						    &pcm_buf_lock,
+						    &compressed_buf_lock,
 						    &ts);
 			if (rc == ETIMEDOUT)
 				if (fverbose)
@@ -261,7 +261,7 @@ playback(void *data)
 		pthread_mutex_lock(&playback_state_lock);
 		if (state->quit) {
 			pthread_mutex_unlock(&playback_state_lock);
-			pthread_mutex_unlock(&pcm_buf_lock);
+			pthread_mutex_unlock(&compressed_buf_lock);
 			break;
 		}
 		pthread_mutex_unlock(&playback_state_lock);
@@ -271,10 +271,10 @@ playback(void *data)
 			err(1, "malloc");
 
 		/* Dequeue, decode and play buffers via libao */
-		list_for_each_safe(iter, q, &pcm_buf.list) {
-			pctx = list_entry(iter, struct pcm_buf,
+		list_for_each_safe(iter, q, &compressed_buf.list) {
+			cbuf = list_entry(iter, struct compressed_buf,
 					  list);
-			p = pctx->buf;
+			p = cbuf->buf;
 			while (1) {
 				frame_len = (uint8_t *)p;
 				if (!*frame_len) {
@@ -283,7 +283,7 @@ playback(void *data)
 					break;
 				}
 				if (p + 1 + *frame_len >
-				    pctx->buf + pctx->len - 1)
+				    cbuf->buf + cbuf->len - 1)
 					break;
 				p++;
 				speex_bits_reset(&bits);
@@ -315,12 +315,12 @@ playback(void *data)
 				/* Each frame is approximately 20ms */
 				usleep(20);
 			}
-			free(pctx->buf);
-			list_del(&pctx->list);
-			free(pctx);
+			free(cbuf->buf);
+			list_del(&cbuf->list);
+			free(cbuf);
 		}
 		free(out);
-		pthread_mutex_unlock(&pcm_buf_lock);
+		pthread_mutex_unlock(&compressed_buf_lock);
 	} while (1);
 
 	speex_bits_destroy(&bits);
@@ -335,25 +335,25 @@ playback(void *data)
 static void
 do_playback(const void *buf, size_t len)
 {
-	struct pcm_buf *pctx;
+	struct compressed_buf *cbuf;
 
-	pctx = malloc(sizeof(*pctx));
-	if (!pctx)
+	cbuf = malloc(sizeof(*cbuf));
+	if (!cbuf)
 		err(1, "malloc");
-	memset(pctx, 0, sizeof(*pctx));
+	memset(cbuf, 0, sizeof(*cbuf));
 
-	pctx->buf = malloc(len);
-	if (!pctx->buf)
+	cbuf->buf = malloc(len);
+	if (!cbuf->buf)
 		err(1, "malloc");
 
-	pctx->len = len;
-	memcpy(pctx->buf, buf, len);
+	cbuf->len = len;
+	memcpy(cbuf->buf, buf, len);
 
-	pthread_mutex_lock(&pcm_buf_lock);
-	INIT_LIST_HEAD(&pctx->list);
-	list_add_tail(&pctx->list, &pcm_buf.list);
+	pthread_mutex_lock(&compressed_buf_lock);
+	INIT_LIST_HEAD(&cbuf->list);
+	list_add_tail(&cbuf->list, &compressed_buf.list);
 	pthread_cond_signal(&tx_pcm_cond);
-	pthread_mutex_unlock(&pcm_buf_lock);
+	pthread_mutex_unlock(&compressed_buf_lock);
 }
 
 /* Input PCM thread, outbound path */
@@ -701,9 +701,9 @@ main(int argc, char *argv[])
 	if (!p1)
 		errx(1, "failed to bind socket");
 
-	INIT_LIST_HEAD(&pcm_buf.list);
+	INIT_LIST_HEAD(&compressed_buf.list);
 
-	pthread_mutex_init(&pcm_buf_lock, NULL);
+	pthread_mutex_init(&compressed_buf_lock, NULL);
 	pthread_cond_init(&tx_pcm_cond, NULL);
 
 	pthread_mutex_init(&playback_state_lock, NULL);
@@ -784,9 +784,9 @@ main(int argc, char *argv[])
 
 	/* Wake up the output thread if it is
 	 * sleeping */
-	pthread_mutex_lock(&pcm_buf_lock);
+	pthread_mutex_lock(&compressed_buf_lock);
 	pthread_cond_signal(&tx_pcm_cond);
-	pthread_mutex_unlock(&pcm_buf_lock);
+	pthread_mutex_unlock(&compressed_buf_lock);
 
 	/* Wait for it */
 	pthread_join(playback_thread, NULL);
