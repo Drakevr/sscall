@@ -59,7 +59,7 @@ static pthread_t playback_thread;
 /* Input PCM thread */
 static pthread_t capture_thread;
 
-/* Shared buf between do_playback()
+/* Shared buf between enqueue_for_playback()
  * and playback thread */
 struct compressed_buf {
 	/* Compressed buffer */
@@ -333,7 +333,7 @@ playback(void *data)
 /* Prepare for output PCM, enqueue buffer
  * and signal playback thread */
 static void
-do_playback(const void *buf, size_t len)
+enqueue_for_playback(const void *buf, size_t len)
 {
 	struct compressed_buf *cbuf;
 
@@ -765,7 +765,7 @@ main(int argc, char *argv[])
 				printf("Received %zd bytes from %s\n",
 				       bytes, host);
 			}
-			do_playback(buf, bytes);
+			enqueue_for_playback(buf, bytes);
 		}
 	} while (1);
 
