@@ -55,12 +55,12 @@ static int speex_frame_size;
 /* Libao handle */
 static ao_device *device;
 /* Output PCM thread */
-static pthread_t output_pcm_thread;
+static pthread_t playback_thread;
 /* Input PCM thread */
-static pthread_t input_pcm_thread;
+static pthread_t capture_thread;
 
-/* Shared buf between do_output_pcm()
- * and output_pcm thread */
+/* Shared buf between do_playback()
+ * and playback thread */
 struct pcm_buf {
 	/* PCM buffer */
 	char *buf;
@@ -70,35 +70,35 @@ struct pcm_buf {
 } pcm_buf;
 
 /* Private structure for the
- * input_pcm thread */
-struct inp_pcm_priv {
+ * capture thread */
+struct capture_priv {
 	/* Input file descriptor */
 	int fd;
 	/* Client socket */
 	int sockfd;
 	/* Client address info */
 	struct addrinfo *servinfo;
-} inp_pcm_priv;
+} capture_priv;
 
 /* Lock that protects pcm_buf */
 static pthread_mutex_t pcm_buf_lock;
 /* Condition variable on which ao_play() blocks */
 static pthread_cond_t tx_pcm_cond;
 
-/* State of the output_pcm thread */
-struct output_pcm_state {
+/* State of the playback thread */
+struct playback_state {
 	int quit;
-} output_pcm_state;
+} playback_state;
 
-/* State of the input_pcm thread */
-struct input_pcm_state {
+/* State of the capture thread */
+struct capture_state {
 	int quit;
-} input_pcm_state;
+} capture_state;
 
-/* Lock that protects output_pcm_state */
-static pthread_mutex_t output_pcm_state_lock;
-/* Lock that protects input_pcm_state */
-static pthread_mutex_t input_pcm_state_lock;
+/* Lock that protects playback_state */
+static pthread_mutex_t playback_state_lock;
+/* Lock that protects capture_state */
+static pthread_mutex_t capture_state_lock;
 
 /* Lock that protects the src_state */
 static pthread_mutex_t src_state_lock;
@@ -206,11 +206,11 @@ src_convert(char *inbuf, size_t inlen, char *outbuf,
 
 /* Play back audio from the client */
 static void *
-output_pcm(void *data)
+playback(void *data)
 {
 	struct pcm_buf *pctx;
 	struct list_head *iter, *q;
-	struct output_pcm_state *state = data;
+	struct playback_state *state = data;
 	struct timespec ts;
 	struct timeval tp;
 	int rc;
@@ -258,13 +258,13 @@ output_pcm(void *data)
 					printf("Output thread is starving...\n");
 		}
 
-		pthread_mutex_lock(&output_pcm_state_lock);
+		pthread_mutex_lock(&playback_state_lock);
 		if (state->quit) {
-			pthread_mutex_unlock(&output_pcm_state_lock);
+			pthread_mutex_unlock(&playback_state_lock);
 			pthread_mutex_unlock(&pcm_buf_lock);
 			break;
 		}
-		pthread_mutex_unlock(&output_pcm_state_lock);
+		pthread_mutex_unlock(&playback_state_lock);
 
 		out = malloc(speex_frame_size * sizeof(*out));
 		if (!out)
@@ -331,9 +331,9 @@ output_pcm(void *data)
 }
 
 /* Prepare for output PCM, enqueue buffer
- * and signal output_pcm thread */
+ * and signal playback thread */
 static void
-do_output_pcm(const void *buf, size_t len)
+do_playback(const void *buf, size_t len)
 {
 	struct pcm_buf *pctx;
 
@@ -358,9 +358,9 @@ do_output_pcm(const void *buf, size_t len)
 
 /* Input PCM thread, outbound path */
 static void *
-input_pcm(void *data)
+capture(void *data)
 {
-	struct input_pcm_state *state = data;
+	struct capture_state *state = data;
 	SpeexBits bits;
 	char inbuf[PCM_BUF_SIZE], downsampled_inbuf[PCM_BUF_SIZE];
 	char outbuf[COMPRESSED_BUF_SIZE];
@@ -394,14 +394,14 @@ input_pcm(void *data)
 
 	speex_bits_init(&bits);
 	do {
-		pthread_mutex_lock(&input_pcm_state_lock);
+		pthread_mutex_lock(&capture_state_lock);
 		if (state->quit) {
-			pthread_mutex_unlock(&input_pcm_state_lock);
+			pthread_mutex_unlock(&capture_state_lock);
 			break;
 		}
-		pthread_mutex_unlock(&input_pcm_state_lock);
+		pthread_mutex_unlock(&capture_state_lock);
 
-		inbytes = read(inp_pcm_priv.fd, inbuf, sizeof(inbuf));
+		inbytes = read(capture_priv.fd, inbuf, sizeof(inbuf));
 		if (inbytes > 0) {
 			/* Downsample from whatever input sample rate
 			 * to 8000kHz, S16_LE and 1 channel */
@@ -453,10 +453,10 @@ input_pcm(void *data)
 			}
 			free(in);
 
-			ret = sendto(inp_pcm_priv.sockfd, outbuf,
+			ret = sendto(capture_priv.sockfd, outbuf,
 				     outbytes, 0,
-				     inp_pcm_priv.servinfo->ai_addr,
-				     inp_pcm_priv.servinfo->ai_addrlen);
+				     capture_priv.servinfo->ai_addr,
+				     capture_priv.servinfo->ai_addrlen);
 			if (ret < 0)
 				warn("sendto");
 			usleep(UDELAY_SEND);
@@ -706,27 +706,27 @@ main(int argc, char *argv[])
 	pthread_mutex_init(&pcm_buf_lock, NULL);
 	pthread_cond_init(&tx_pcm_cond, NULL);
 
-	pthread_mutex_init(&output_pcm_state_lock, NULL);
-	pthread_mutex_init(&input_pcm_state_lock, NULL);
+	pthread_mutex_init(&playback_state_lock, NULL);
+	pthread_mutex_init(&capture_state_lock, NULL);
 
 	pthread_mutex_init(&src_state_lock, NULL);
 
-	ret = pthread_create(&output_pcm_thread, NULL,
-			     output_pcm, &output_pcm_state);
+	ret = pthread_create(&playback_thread, NULL,
+			     playback, &playback_state);
 	if (ret) {
 		errno = ret;
 		err(1, "pthread_create");
 	}
 
-	inp_pcm_priv.fd = recfd;
-	inp_pcm_priv.sockfd = cli_sockfd;
-	inp_pcm_priv.servinfo = p0;
+	capture_priv.fd = recfd;
+	capture_priv.sockfd = cli_sockfd;
+	capture_priv.servinfo = p0;
 
-	set_nonblocking(inp_pcm_priv.fd);
-	set_nonblocking(inp_pcm_priv.sockfd);
+	set_nonblocking(capture_priv.fd);
+	set_nonblocking(capture_priv.sockfd);
 
-	ret = pthread_create(&input_pcm_thread, NULL,
-			     input_pcm, &input_pcm_state);
+	ret = pthread_create(&capture_thread, NULL,
+			     capture, &capture_state);
 	if (ret) {
 		errno = ret;
 		err(1, "pthread_create");
@@ -765,22 +765,22 @@ main(int argc, char *argv[])
 				printf("Received %zd bytes from %s\n",
 				       bytes, host);
 			}
-			do_output_pcm(buf, bytes);
+			do_playback(buf, bytes);
 		}
 	} while (1);
 
 	/* Prepare input thread to be killed */
-	pthread_mutex_lock(&input_pcm_state_lock);
-	input_pcm_state.quit = 1;
-	pthread_mutex_unlock(&input_pcm_state_lock);
+	pthread_mutex_lock(&capture_state_lock);
+	capture_state.quit = 1;
+	pthread_mutex_unlock(&capture_state_lock);
 
 	/* Wait for it */
-	pthread_join(input_pcm_thread, NULL);
+	pthread_join(capture_thread, NULL);
 
 	/* Prepare output thread to be killed */
-	pthread_mutex_lock(&output_pcm_state_lock);
-	output_pcm_state.quit = 1;
-	pthread_mutex_unlock(&output_pcm_state_lock);
+	pthread_mutex_lock(&playback_state_lock);
+	playback_state.quit = 1;
+	pthread_mutex_unlock(&playback_state_lock);
 
 	/* Wake up the output thread if it is
 	 * sleeping */
@@ -789,7 +789,7 @@ main(int argc, char *argv[])
 	pthread_mutex_unlock(&pcm_buf_lock);
 
 	/* Wait for it */
-	pthread_join(output_pcm_thread, NULL);
+	pthread_join(playback_thread, NULL);
 
 	src_delete(src_state);
 
