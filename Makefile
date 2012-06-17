@@ -1,6 +1,6 @@
 BIN = sscall
 VER = 0.2-rc2
-SRC = sscall.c
+SRC = sscall.c speex_jitter_buffer.c
 OBJ = ${SRC:.c=.o}
 
 PREFIX = /usr
@@ -15,7 +15,7 @@ LIBS = -L/usr/local/lib
 
 CFLAGS += -g -O3 -Wall -Wextra -Wunused -DVERSION=\"${VER}\" ${INCS}
 # Add -lsocket if you are building on Solaris
-LDFLAGS += -lao -lpthread -lspeex -lsamplerate ${LIBS}
+LDFLAGS += -lao -lpthread -lspeex -lspeexdsp ${LIBS}
 
 $(BIN): ${OBJ}
 	${CC} ${CFLAGS} ${LDFLAGS} -o $@ ${OBJ}

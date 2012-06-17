@@ -20,18 +20,15 @@
 #include <ao/ao.h>
 #include <pthread.h>
 #include <speex/speex.h>
-#include <samplerate.h>
+#include <speex/speex_jitter.h>
+#include "speex_jitter_buffer.h"
 
 #include "list.h"
 
 /* Input/Output PCM buffer size */
-#define PCM_BUF_SIZE (16000)
+#define FRAME_SIZE (320)
 /* Input/Output compressed buffer size */
-#define COMPRESSED_BUF_SIZE (640)
-/* Sleep at least 50ms between each sendto() call */
-#define UDELAY_SEND (50 * 1000)
-/* Fallback thread scheduling priority */
-#define FALLBACK_PRIO 40
+#define COMPRESSED_BUF_SIZE (1500)
 
 /* Command line option, bits per sample */
 static int fbits;
@@ -44,20 +41,23 @@ static int fdevid;
 /* Command line option, verbosity flag */
 static int fverbose;
 
-/* Libsample rate state */
-SRC_STATE *src_state;
 /* Libspeex encoder state */
-void *speex_enc_state;
+static void *speex_enc_state;
 /* Libspeex decoder state */
-void *speex_dec_state;
-/* Desired frame size, queried at run-time */
-static int speex_frame_size;
+static void *speex_dec_state;
+/* Jitter buffer */
+static SpeexJitter speex_jitter;
 /* Libao handle */
 static ao_device *device;
 /* Output PCM thread */
 static pthread_t playback_thread;
 /* Input PCM thread */
 static pthread_t capture_thread;
+
+struct compressed_header {
+	uint32_t nil_bytes;
+	uint32_t timestamp;
+} __attribute__ ((packed));
 
 /* Shared buf between enqueue_for_playback()
  * and playback thread */
@@ -99,110 +99,13 @@ struct capture_state {
 static pthread_mutex_t playback_state_lock;
 /* Lock that protects capture_state */
 static pthread_mutex_t capture_state_lock;
-
 /* Lock that protects the src_state */
 static pthread_mutex_t src_state_lock;
+/* Lock that protects Speex jitter buffer */
+static pthread_mutex_t speex_jitter_lock;
 
 /* Set to 1 when SIGINT is received */
 static volatile int handle_sigint;
-
-/* libsamplerate downsample/upsample operations */
-enum src_action {
-	SRC_DOWNSAMPLE,
-	SRC_UPSAMPLE
-};
-
-/* This function is fixed to work with S16_LE only */
-static int
-src_convert(char *inbuf, size_t inlen, char *outbuf,
-	    size_t outlen, size_t *actual_outlen,
-	    enum src_action src_action)
-{
-	float *in;
-	float *out;
-	short *input = (short *)inbuf;
-	short *output = (short *)outbuf;
-	long i;
-	SRC_DATA src_data;
-	long in_frame_size = (long)inlen / 2;
-	long out_frame_size = (long)outlen / 2;
-	int ret;
-	long outframes;
-
-	/* We don't need to sample convert
-	 * if the chosen sample rate is 8kHz */
-	if (frate == 8000) {
-		*actual_outlen = inlen;
-		if (outlen < inlen) {
-			*actual_outlen = outlen;
-			warnx("Truncating output buffer");
-		}
-		memcpy(outbuf, inbuf, *actual_outlen);
-		return 0;
-	}
-
-	/* Allocate input, output buffers for
-	 * use by libsamplerate */
-	in = malloc(in_frame_size * sizeof(*in));
-	if (!in)
-		err(1, "malloc");
-
-	out = malloc(out_frame_size * sizeof(*out));
-	if (!out)
-		err(1, "malloc");
-
-	/* Convert short values into float values
-	 * so that libsamplerate can work on them */
-	for (i = 0; i < in_frame_size; i++)
-		in[i] = input[i];
-
-	for (i = 0; i < out_frame_size; i++)
-		out[i] = 0.f;
-
-	memset(&src_data, 0, sizeof(src_data));
-	src_data.data_in = in;
-	src_data.data_out = out;
-	src_data.input_frames = in_frame_size / fchan;
-	src_data.output_frames = out_frame_size / fchan;
-	/* Last and only buffer */
-	src_data.end_of_input = 1;
-	if (src_action == SRC_DOWNSAMPLE)
-		src_data.src_ratio = 8000.0 / (double)frate;
-	else if (src_action == SRC_UPSAMPLE)
-		src_data.src_ratio = (double)frate / 8000.0;
-	else {
-		free(in);
-		free(out);
-		return -EINVAL;
-	}
-
-	/* TODO: src_process() can return a partially
-	 * filled output buffer, ensure we handle this
-	 * in the future */
-	pthread_mutex_lock(&src_state_lock);
-	ret = src_process(src_state, &src_data);
-	if (ret) {
-		pthread_mutex_unlock(&src_state_lock);
-		errx(1, "src_process failed: %s",
-		     src_strerror(ret));
-	}
-	src_reset(src_state);
-	pthread_mutex_unlock(&src_state_lock);
-
-	if (src_data.input_frames_used != src_data.input_frames)
-		warnx("Did not convert entire input buffer");
-
-	outframes = src_data.output_frames_gen;
-	for (i = 0; i < outframes && i < (long)outlen / 2; i++)
-		output[i] = src_data.data_out[i];
-
-	*actual_outlen = i * 2;
-
-	free(in);
-	free(out);
-
-	return ret;
-}
 
 /* Play back audio from the client */
 static void *
@@ -214,30 +117,8 @@ playback(void *data)
 	struct timespec ts;
 	struct timeval tp;
 	int rc;
-	SpeexBits bits;
-	short *out;
-	uint8_t *frame_len;
-	char *p;
-	char upsampled_pcm[PCM_BUF_SIZE];
-	size_t upsampled_bytes;
-	int ret;
-	pthread_attr_t tattr;
-	int prio;
-	struct sched_param param;
+	spx_int16_t pcm[FRAME_SIZE];
 
-	prio = sched_get_priority_min(SCHED_FIFO);
-	if (prio < 0)
-		prio = FALLBACK_PRIO;
-	memset(&param, 0, sizeof(param));
-	param.sched_priority = prio;
-
-	ret = pthread_attr_setschedparam(&tattr, &param);
-	if (ret < 0) {
-		errno = ret;
-		err(1, "phtread_attr_setschedparam");
-	}
-
-	speex_bits_init(&bits);
 	do {
 		pthread_mutex_lock(&compressed_buf_lock);
 		gettimeofday(&tp, NULL);
@@ -266,64 +147,23 @@ playback(void *data)
 		}
 		pthread_mutex_unlock(&playback_state_lock);
 
-		out = malloc(speex_frame_size * sizeof(*out));
-		if (!out)
-			err(1, "malloc");
-
 		/* Dequeue, decode and play buffers via libao */
 		list_for_each_safe(iter, q, &compressed_buf.list) {
 			cbuf = list_entry(iter, struct compressed_buf,
 					  list);
-			p = cbuf->buf;
-			while (1) {
-				frame_len = (uint8_t *)p;
-				if (!*frame_len) {
-					warnx("Invalid frame length: %hhu\n",
-					      *frame_len);
-					break;
-				}
-				if (p + 1 + *frame_len >
-				    cbuf->buf + cbuf->len - 1)
-					break;
-				p++;
-				speex_bits_reset(&bits);
-				/* Copy the data into the bit-stream format */
-				speex_bits_read_from(&bits, p,
-						     *frame_len);
-				p += *frame_len;
-				/* Ensure output buffer is zero-filled */
-				memset(out, 0,
-				       speex_frame_size * sizeof(*out));
-				/* Zero-fill playback buffer in case we have a
-				 * decode error */
-				memset(upsampled_pcm, 0, sizeof(upsampled_pcm));
-				upsampled_bytes = sizeof(upsampled_pcm);
-				/* Decode it */
-				ret = speex_decode_int(speex_dec_state, &bits,
-						       out);
-				if (!ret)
-					/* Upsample the stream */
-					src_convert((char *)out, speex_frame_size * sizeof(*out),
-						    upsampled_pcm, sizeof(upsampled_pcm),
-						    &upsampled_bytes, SRC_UPSAMPLE);
-				else
-					warnx("speex_decode_int failed: %d", ret);
 
-				/* Play it! */
-				ao_play(device, upsampled_pcm,
-					upsampled_bytes);
-				/* Each frame is approximately 20ms */
-				usleep(20);
-			}
+			pthread_mutex_lock(&speex_jitter_lock);
+			speex_jitter_get(&speex_jitter, pcm, 0);
+			pthread_mutex_unlock(&speex_jitter_lock);
+
+			ao_play(device, (void *)pcm, sizeof(pcm));
+
 			free(cbuf->buf);
 			list_del(&cbuf->list);
 			free(cbuf);
 		}
-		free(out);
 		pthread_mutex_unlock(&compressed_buf_lock);
 	} while (1);
-
-	speex_bits_destroy(&bits);
 
 	pthread_exit(NULL);
 
@@ -336,18 +176,29 @@ static void
 enqueue_for_playback(const void *buf, size_t len)
 {
 	struct compressed_buf *cbuf;
+	int recv_timestamp;
+	struct compressed_header *hdr;
 
 	cbuf = malloc(sizeof(*cbuf));
 	if (!cbuf)
 		err(1, "malloc");
 	memset(cbuf, 0, sizeof(*cbuf));
 
-	cbuf->buf = malloc(len);
+	cbuf->len = len - sizeof(*hdr);
+	cbuf->buf = malloc(cbuf->len);
 	if (!cbuf->buf)
 		err(1, "malloc");
 
-	cbuf->len = len;
-	memcpy(cbuf->buf, buf, len);
+	memcpy(cbuf->buf, buf + sizeof(*hdr),
+	       cbuf->len);
+
+	hdr = (struct compressed_header *)buf;
+	recv_timestamp = hdr->timestamp;
+
+	pthread_mutex_lock(&speex_jitter_lock);
+	speex_jitter_put(&speex_jitter, cbuf->buf,
+			 cbuf->len, recv_timestamp);
+	pthread_mutex_unlock(&speex_jitter_lock);
 
 	pthread_mutex_lock(&compressed_buf_lock);
 	INIT_LIST_HEAD(&cbuf->list);
@@ -362,37 +213,16 @@ capture(void *data)
 {
 	struct capture_state *state = data;
 	SpeexBits bits;
-	char inbuf[PCM_BUF_SIZE], downsampled_inbuf[PCM_BUF_SIZE];
+	spx_int16_t inbuf[FRAME_SIZE];
 	char outbuf[COMPRESSED_BUF_SIZE];
 	ssize_t inbytes;
-	size_t downsampled_inbytes;
 	size_t outbytes;
-	char *p, *q;
-	short *in;
-	int nr_frames;
-	/* Expected number of bytes for compressed frame */
-	int out_expected;
-	uint8_t *frame_len;
-	ssize_t i;
 	ssize_t ret;
-
-	pthread_attr_t tattr;
-	int prio;
-	struct sched_param param;
-
-	prio = sched_get_priority_min(SCHED_FIFO);
-	if (prio < 0)
-		prio = FALLBACK_PRIO;
-	memset(&param, 0, sizeof(param));
-	param.sched_priority = prio;
-
-	ret = pthread_attr_setschedparam(&tattr, &param);
-	if (ret < 0) {
-		errno = ret;
-		err(1, "phtread_attr_setschedparam");
-	}
+	int timestamp;
+	struct compressed_header *hdr;
 
 	speex_bits_init(&bits);
+	timestamp = 0;
 	do {
 		pthread_mutex_lock(&capture_state_lock);
 		if (state->quit) {
@@ -403,63 +233,25 @@ capture(void *data)
 
 		inbytes = read(capture_priv.fd, inbuf, sizeof(inbuf));
 		if (inbytes > 0) {
-			/* Downsample from whatever input sample rate
-			 * to 8000kHz, S16_LE and 1 channel */
-			src_convert(inbuf, inbytes,
-				    downsampled_inbuf,
-				    sizeof(downsampled_inbuf),
-				    &downsampled_inbytes,
-				    SRC_DOWNSAMPLE);
-			memset(inbuf, 0, sizeof(inbuf));
-			memcpy(inbuf, downsampled_inbuf, downsampled_inbytes);
-			inbytes = downsampled_inbytes;
-
-			outbytes = 0;
-			/* Fixed to 16 bits for now */
-			nr_frames = (inbytes / 2) / speex_frame_size;
-			/* Allocate buffer for Speex processing */
-			in = malloc(speex_frame_size * sizeof(*in));
-			if (!in)
-				err(1, "malloc");
-
-			p = outbuf;
-			q = inbuf;
-			for (i = 0; i < nr_frames; i++) {
-				/* Reset the bit-stream struct */
-				speex_bits_reset(&bits);
-				/* Copy in PCM into input buffer for Speex
-				 * to process it */
-				memcpy(in, q, speex_frame_size * sizeof(*in));
-				q += speex_frame_size * sizeof(*in);
-				/* Encode the input stream */
-				speex_encode_int(speex_enc_state, in, &bits);
-				/* Fetch the size of the compressed frame */
-				out_expected = speex_bits_nbytes(&bits);
-				if (p + out_expected + 1 >
-				    &outbuf[sizeof(outbuf) - 1])
-					break;
-				frame_len = (uint8_t *)p;
-				/* Pre-append the size of the frame */
-				*frame_len = out_expected;
-				p++;
-				outbytes++;
-				/* Fill up the buffer with the encoded stream */
-				speex_bits_write(&bits, p,
-						 out_expected);
-				p += out_expected;
-				outbytes += out_expected;
-				if (q >= &inbuf[inbytes - 1])
-					break;
-			}
-			free(in);
-
+			speex_bits_reset(&bits);
+			/* Encode input buffer */
+			speex_encode_int(speex_enc_state, inbuf, &bits);
+			/* Fill up the buffer with the encoded stream */
+			outbytes = speex_bits_write(&bits,
+						    outbuf + sizeof(*hdr),
+						    sizeof(outbuf) - sizeof(*hdr));
+			/* Pre-append the header */
+			hdr = (struct compressed_header *)outbuf;
+			hdr->nil_bytes = htonl(0);
+			hdr->timestamp = timestamp;
+			timestamp += FRAME_SIZE;
+			/* Send the buffer out */
 			ret = sendto(capture_priv.sockfd, outbuf,
-				     outbytes, 0,
+				     outbytes + sizeof(*hdr), 0,
 				     capture_priv.servinfo->ai_addr,
 				     capture_priv.servinfo->ai_addrlen);
 			if (ret < 0)
 				warn("sendto");
-			usleep(UDELAY_SEND);
 		}
 	} while (1);
 
@@ -514,7 +306,7 @@ set_nonblocking(int fd)
 
 static void
 init_ao(int rate, int bits, int chans,
-	   int *devid)
+	int *devid)
 {
 	ao_sample_format format;
 	int default_driver;
@@ -541,29 +333,30 @@ init_ao(int rate, int bits, int chans,
 static void
 init_speex(void)
 {
-	int quality;
+	int tmp;
 
-	/* Create a new encoder/decoder state in narrowband mode */
-	speex_enc_state = speex_encoder_init(&speex_nb_mode);
-	speex_dec_state = speex_decoder_init(&speex_nb_mode);
-	/* Set the quality to 9 (18.4 kbps), we should make
-	 * this configurable in the future */
-	quality = 9;
-	speex_encoder_ctl(speex_enc_state, SPEEX_SET_QUALITY, &quality);
-	/* Retrieve the preferred frame size */
-	speex_encoder_ctl(speex_enc_state, SPEEX_GET_FRAME_SIZE,
-			  &speex_frame_size);
+	/* Create a new encoder/decoder state in wideband mode */
+	speex_enc_state = speex_encoder_init(&speex_wb_mode);
+	speex_dec_state = speex_decoder_init(&speex_wb_mode);
+	tmp = 8;
+	speex_encoder_ctl(speex_enc_state, SPEEX_SET_QUALITY, &tmp);
+	tmp = 2;
+	speex_encoder_ctl(speex_enc_state, SPEEX_SET_COMPLEXITY, &tmp);
+	speex_jitter_init(&speex_jitter, speex_dec_state);
 }
 
 static void
-init_samplerate(void)
+deinit_ao(void)
 {
-	int error;
+	ao_close(device);
+	ao_shutdown();
+}
 
-	src_state = src_new(SRC_SINC_FASTEST, fchan, &error);
-	if (!src_state)
-		errx(1, "src_new failed: %s",
-		     src_strerror(error));
+static void
+deinit_speex(void)
+{
+	speex_encoder_destroy(speex_enc_state);
+	speex_decoder_destroy(speex_dec_state);
 }
 
 int
@@ -571,7 +364,7 @@ main(int argc, char *argv[])
 {
 	int recfd = STDIN_FILENO;
 	ssize_t bytes;
-	char buf[PCM_BUF_SIZE];
+	char buf[COMPRESSED_BUF_SIZE];
 	int cli_sockfd, srv_sockfd;
 	struct addrinfo cli_hints, *cli_servinfo, *p0, *p1;
 	struct addrinfo srv_hints, *srv_servinfo;
@@ -636,7 +429,6 @@ main(int argc, char *argv[])
 
 	init_ao(frate, fbits, fchan, &fdevid);
 	init_speex();
-	init_samplerate();
 
 	if (fverbose) {
 		printf("Bits per sample: %d\n", fbits);
@@ -705,6 +497,7 @@ main(int argc, char *argv[])
 
 	pthread_mutex_init(&playback_state_lock, NULL);
 	pthread_mutex_init(&capture_state_lock, NULL);
+	pthread_mutex_init(&speex_jitter_lock, NULL);
 
 	pthread_mutex_init(&src_state_lock, NULL);
 
@@ -788,13 +581,8 @@ main(int argc, char *argv[])
 	/* Wait for it */
 	pthread_join(playback_thread, NULL);
 
-	src_delete(src_state);
-
-	speex_encoder_destroy(speex_enc_state);
-	speex_decoder_destroy(speex_dec_state);
-
-	ao_close(device);
-	ao_shutdown();
+	deinit_ao();
+	deinit_speex();
 
 	freeaddrinfo(cli_servinfo);
 	freeaddrinfo(srv_servinfo);

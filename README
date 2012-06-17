@@ -2,7 +2,7 @@ What is it?
 ===========
 
 A simple UDP based voice chat program.  Currently
-we have support for libspeex and libsamplerate.
+we have support for libspeex.
 There will also be dtls support soon.
 
 Why?
