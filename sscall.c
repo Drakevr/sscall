@@ -45,7 +45,7 @@ static int fverbose;
 static void *speex_enc_state;
 /* Libspeex decoder state */
 static void *speex_dec_state;
-/* Jitter buffer */
+/* Speex Jitter buffer */
 static SpeexJitter speex_jitter;
 /* Libao handle */
 static ao_device *device;
