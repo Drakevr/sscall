@@ -170,10 +170,20 @@ playback(void *data)
 	return NULL;
 }
 
-/* Prepare for output PCM, enqueue buffer
- * and signal playback thread */
 static void
-enqueue_for_playback(const void *buf, size_t len)
+enqueue_for_playback(struct compressed_buf *cbuf)
+{
+	pthread_mutex_lock(&compressed_buf_lock);
+	INIT_LIST_HEAD(&cbuf->list);
+	list_add_tail(&cbuf->list, &compressed_buf.list);
+	pthread_cond_signal(&tx_pcm_cond);
+	pthread_mutex_unlock(&compressed_buf_lock);
+}
+
+/* Parse the compressed packet and enqueue it for
+ * playback */
+static void
+process_compressed_packet(const void *buf, size_t len)
 {
 	struct compressed_buf *cbuf;
 	int recv_timestamp;
@@ -200,11 +210,7 @@ enqueue_for_playback(const void *buf, size_t len)
 			 cbuf->len, recv_timestamp);
 	pthread_mutex_unlock(&speex_jitter_lock);
 
-	pthread_mutex_lock(&compressed_buf_lock);
-	INIT_LIST_HEAD(&cbuf->list);
-	list_add_tail(&cbuf->list, &compressed_buf.list);
-	pthread_cond_signal(&tx_pcm_cond);
-	pthread_mutex_unlock(&compressed_buf_lock);
+	enqueue_for_playback(cbuf);
 }
 
 /* Input PCM thread, outbound path */
@@ -555,7 +561,7 @@ main(int argc, char *argv[])
 				printf("Received %zd bytes from %s\n",
 				       bytes, host);
 			}
-			enqueue_for_playback(buf, bytes);
+			process_compressed_packet(buf, bytes);
 		}
 	} while (1);
 
