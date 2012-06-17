@@ -55,7 +55,8 @@ static pthread_t playback_thread;
 static pthread_t capture_thread;
 
 struct compressed_header {
-	uint32_t nil_bytes;
+	/* Start of frame signature */
+	uint32_t sig;
 	uint32_t timestamp;
 } __attribute__ ((packed));
 
@@ -250,7 +251,7 @@ capture(void *data)
 						    sizeof(outbuf) - sizeof(*hdr));
 			/* Pre-append the header */
 			hdr = (struct compressed_header *)outbuf;
-			hdr->nil_bytes = htonl(0xcafebabe);
+			hdr->sig = htonl(0xcafebabe);
 			hdr->timestamp = timestamp;
 			timestamp += FRAME_SIZE;
 			/* Send the buffer out */
