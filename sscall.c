@@ -368,6 +368,7 @@ deinit_speex(void)
 {
 	speex_encoder_destroy(speex_enc_state);
 	speex_decoder_destroy(speex_dec_state);
+	speex_jitter_destroy(&speex_jitter);
 }
 
 int
