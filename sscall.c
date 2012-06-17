@@ -431,7 +431,7 @@ main(int argc, char *argv[])
 		     fchan);
 
 	if (!frate)
-		frate = 8000;
+		frate = 16000;
 
 	init_ao(frate, fbits, fchan, &fdevid);
 	init_speex();
