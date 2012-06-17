@@ -250,7 +250,7 @@ capture(void *data)
 						    sizeof(outbuf) - sizeof(*hdr));
 			/* Pre-append the header */
 			hdr = (struct compressed_header *)outbuf;
-			hdr->nil_bytes = htonl(0);
+			hdr->nil_bytes = htonl(0xcafebabe);
 			hdr->timestamp = timestamp;
 			timestamp += FRAME_SIZE;
 			/* Send the buffer out */
