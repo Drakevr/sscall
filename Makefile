@@ -1,6 +1,6 @@
 BIN = sscall
 VER = 0.2-rc3
-SRC = sscall.c speex_jitter_buffer.c
+SRC = src/sscall.c src/speex_jitter_buffer.c
 OBJ = ${SRC:.c=.o}
 
 PREFIX = /usr
@@ -43,8 +43,8 @@ uninstall:
 
 dist: clean
 	mkdir -p sscall-${VER}
-	cp -R CONTRIBUTORS LICENSE linux list.h Makefile \
-		man obsd README sscall.c test-files \
+	cp -R CONTRIBUTORS LICENSE linux Makefile \
+		man obsd README src test-files \
 		TODO sscall-${VER}
 	tar -cf sscall-${VER}.tar sscall-${VER}
 	gzip sscall-${VER}.tar
