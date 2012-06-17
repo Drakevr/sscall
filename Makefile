@@ -44,7 +44,7 @@ uninstall:
 dist: clean
 	mkdir -p sscall-${VER}
 	cp -R CONTRIBUTORS LICENSE linux list.h Makefile \
-		man obsd README sscall.c sscall.h test-files \
+		man obsd README sscall.c test-files \
 		TODO sscall-${VER}
 	tar -cf sscall-${VER}.tar sscall-${VER}
 	gzip sscall-${VER}.tar
