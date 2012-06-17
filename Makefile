@@ -1,5 +1,5 @@
 BIN = sscall
-VER = 0.2-rc2
+VER = 0.2-rc3
 SRC = sscall.c speex_jitter_buffer.c
 OBJ = ${SRC:.c=.o}
 
