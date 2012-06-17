@@ -205,6 +205,7 @@ process_compressed_packet(const void *buf, size_t len)
 	memcpy(cbuf->buf, buf + sizeof(*hdr),
 	       cbuf->len);
 
+	/* TODO: Check signature here as well */
 	hdr = (struct compressed_header *)buf;
 	recv_timestamp = hdr->timestamp;
 
