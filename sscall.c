@@ -152,10 +152,12 @@ playback(void *data)
 			cbuf = list_entry(iter, struct compressed_buf,
 					  list);
 
+			/* Decode compressed buffer */
 			pthread_mutex_lock(&speex_jitter_lock);
 			speex_jitter_get(&speex_jitter, pcm, 0);
 			pthread_mutex_unlock(&speex_jitter_lock);
 
+			/* Play via libao */
 			ao_play(device, (void *)pcm, sizeof(pcm));
 
 			free(cbuf->buf);
@@ -344,10 +346,13 @@ init_speex(void)
 	/* Create a new encoder/decoder state in wideband mode */
 	speex_enc_state = speex_encoder_init(&speex_wb_mode);
 	speex_dec_state = speex_decoder_init(&speex_wb_mode);
+	/* Set the encoder's quality */
 	tmp = 8;
 	speex_encoder_ctl(speex_enc_state, SPEEX_SET_QUALITY, &tmp);
 	tmp = 2;
+	/* Set the encoder's complexity */
 	speex_encoder_ctl(speex_enc_state, SPEEX_SET_COMPLEXITY, &tmp);
+	/* Init the Speex Jitter Buffer */
 	speex_jitter_init(&speex_jitter, speex_dec_state);
 }
 
@@ -534,8 +539,8 @@ main(int argc, char *argv[])
 	if (signal(SIGUSR1, sig_handler) == SIG_ERR)
 		err(1, "signal");
 
-	/* Receive audio data from other end and prepare
-	 * for playback */
+	/* Main processing loop, receive compressed data,
+	 * parse and prepare for playback */
 	do {
 		/* Handle SIGINT gracefully */
 		if (handle_sigint) {
