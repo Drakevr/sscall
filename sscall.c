@@ -592,8 +592,8 @@ main(int argc, char *argv[])
 	/* Wait for it */
 	pthread_join(playback_thread, NULL);
 
-	deinit_ao();
 	deinit_speex();
+	deinit_ao();
 
 	freeaddrinfo(cli_servinfo);
 	freeaddrinfo(srv_servinfo);
