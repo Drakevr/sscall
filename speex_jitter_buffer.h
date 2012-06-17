@@ -1,4 +1,5 @@
 /* Copyright (C) 2002 Jean-Marc Valin */
+
 #ifndef _SPEEX_JITTER_BUFFER_H
 #define _SPEEX_JITTER_BUFFER_H
 

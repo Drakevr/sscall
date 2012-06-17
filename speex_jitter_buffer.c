@@ -1,4 +1,5 @@
 /* Copyright (C) 2002 Jean-Marc Valin */
+
 #include <stddef.h>
 #include <err.h>
 
