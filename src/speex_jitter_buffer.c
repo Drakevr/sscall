@@ -18,7 +18,6 @@ speex_jitter_init(SpeexJitter *jitter, void *decoder)
 
 	speex_bits_init(&jitter->current_packet);
 	jitter->valid_bits = 0;
-
 }
 
 void
@@ -85,8 +84,8 @@ speex_jitter_get(SpeexJitter *jitter, spx_int16_t *out,
 			jitter->valid_bits = 1;
 		} else {
 			/* Error while decoding */
-			for (i=0;i<jitter->frame_size;i++)
-				out[i]=0;
+			for (i = 0; i < jitter->frame_size; i++)
+				out[i] = 0;
 		}
 	}
 	speex_decoder_ctl(jitter->dec, SPEEX_GET_ACTIVITY, &activity);
