@@ -192,6 +192,7 @@ process_compressed_packet(const void *buf, size_t len)
 {
 	struct compressed_buf *cbuf;
 	int recv_timestamp;
+	uint32_t sig;
 	struct compressed_header *hdr;
 
 	cbuf = malloc(sizeof(*cbuf));
@@ -207,8 +208,16 @@ process_compressed_packet(const void *buf, size_t len)
 	memcpy(cbuf->buf, buf + sizeof(*hdr),
 	       cbuf->len);
 
-	/* TODO: Check signature here as well */
 	hdr = (struct compressed_header *)buf;
+	sig = ntohl(hdr->sig);
+	if (sig != 0xcafebabe) {
+		if (fverbose)
+			warnx("Received corrupt packet: %lx\n",
+			      (unsigned long)sig);
+		free(cbuf->buf);
+		free(cbuf);
+		return;
+	}
 	recv_timestamp = hdr->timestamp;
 
 	pthread_mutex_lock(&speex_jitter_lock);
