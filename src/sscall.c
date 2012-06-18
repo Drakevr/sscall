@@ -128,9 +128,11 @@ playback(void *data)
 	spx_uint32_t outlen;
 
 	/* Prepare the resampler configuration */
+	/* Input length is in frames */
 	inlen = FRAME_SIZE;
 	outlen = (FRAME_SIZE * 16000) / 8000;
 	outlen *= frate;
+	/* Output length is in bytes */
 	outlen /= 16000;
 	pcm_sample_convert = malloc(outlen);
 	if (!pcm_sample_convert)
@@ -174,10 +176,12 @@ playback(void *data)
 			speex_jitter_get(&speex_jitter, pcm, 0);
 			pthread_mutex_unlock(&speex_jitter_lock);
 
+			/* Sample convert the RX path */
 			speex_resampler_process_int(speex_resampler_rx,
 						    0, (void *)pcm, &inlen,
 						    (void *)pcm_sample_convert,
 						    &outlen);
+			/* Outlen is in frames, convert to bytes */
 			outlen *= 2;
 
 			/* Play via libao */
@@ -289,6 +293,7 @@ capture(void *data)
 
 		inbytes = read(capture_priv.fd, inbuf, sizeof(inbuf));
 		if (inbytes > 0) {
+			/* Sampler convert the TX path */
 			speex_resampler_process_int(speex_resampler_tx,
 						    0, (void *)inbuf, &inlen,
 						    (void *)inbuf_sample_convert,
