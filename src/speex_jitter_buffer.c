@@ -71,7 +71,6 @@ speex_jitter_get(SpeexJitter *jitter, spx_int16_t *out,
 
 	if (ret != JITTER_BUFFER_OK)
 	{
-		warnx("Late or lost frame!");
 		speex_decode_int(jitter->dec, NULL, out);
 	} else {
 		speex_bits_read_from(&jitter->current_packet,
