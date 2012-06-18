@@ -54,6 +54,8 @@ static pthread_t playback_thread;
 /* Input PCM thread */
 static pthread_t capture_thread;
 
+/* Compressed header at the start
+ * of each compressed packet */
 struct compressed_header {
 	/* Start of frame signature */
 	uint32_t sig;
