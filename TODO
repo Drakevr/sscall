@@ -13,3 +13,4 @@
 * Add support for Speex resampler
 * Fix baseline sample rate at 16kHz
 * Buffer up as many packets as possible in a single transfer
+* Default port, pick up port from incoming connection.
