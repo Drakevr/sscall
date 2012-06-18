@@ -20,6 +20,7 @@
 #include <ao/ao.h>
 #include <pthread.h>
 #include <speex/speex.h>
+#include <speex/speex_resampler.h>
 #include <speex/speex_jitter.h>
 #include "speex_jitter_buffer.h"
 
@@ -47,6 +48,9 @@ static void *speex_enc_state;
 static void *speex_dec_state;
 /* Speex Jitter buffer */
 static SpeexJitter speex_jitter;
+/* TX/RX Speex resampler state */
+static SpeexResamplerState *speex_resampler_tx;
+static SpeexResamplerState *speex_resampler_rx;
 /* Libao handle */
 static ao_device *device;
 /* Output PCM thread */
@@ -102,8 +106,6 @@ struct capture_state {
 static pthread_mutex_t playback_state_lock;
 /* Lock that protects capture_state */
 static pthread_mutex_t capture_state_lock;
-/* Lock that protects the src_state */
-static pthread_mutex_t src_state_lock;
 /* Lock that protects Speex jitter buffer */
 static pthread_mutex_t speex_jitter_lock;
 
@@ -121,6 +123,18 @@ playback(void *data)
 	struct timeval tp;
 	int rc;
 	spx_int16_t pcm[FRAME_SIZE];
+	spx_int16_t *pcm_sample_convert;
+	spx_uint32_t inlen;
+	spx_uint32_t outlen;
+
+	/* Prepare the resampler configuration */
+	inlen = FRAME_SIZE;
+	outlen = (FRAME_SIZE * 16000) / 8000;
+	outlen *= frate;
+	outlen /= 16000;
+	pcm_sample_convert = malloc(outlen);
+	if (!pcm_sample_convert)
+		err(1, "malloc");
 
 	do {
 		pthread_mutex_lock(&compressed_buf_lock);
@@ -160,8 +174,15 @@ playback(void *data)
 			speex_jitter_get(&speex_jitter, pcm, 0);
 			pthread_mutex_unlock(&speex_jitter_lock);
 
+			speex_resampler_process_int(speex_resampler_rx,
+						    0, (void *)pcm, &inlen,
+						    (void *)pcm_sample_convert,
+						    &outlen);
+			outlen *= 2;
+
 			/* Play via libao */
-			ao_play(device, (void *)pcm, sizeof(pcm));
+			ao_play(device, (void *)pcm_sample_convert,
+				outlen);
 
 			free(cbuf->buf);
 			list_del(&cbuf->list);
@@ -169,6 +190,8 @@ playback(void *data)
 		}
 		pthread_mutex_unlock(&compressed_buf_lock);
 	} while (1);
+
+	free(pcm_sample_convert);
 
 	pthread_exit(NULL);
 
@@ -236,11 +259,23 @@ capture(void *data)
 	SpeexBits bits;
 	spx_int16_t inbuf[FRAME_SIZE];
 	char outbuf[COMPRESSED_BUF_SIZE];
+	char *inbuf_sample_convert;
 	ssize_t inbytes;
 	size_t outbytes;
+	spx_uint32_t inlen;
+	spx_uint32_t outlen;
 	ssize_t ret;
 	int timestamp;
 	struct compressed_header *hdr;
+
+	/* Prepare the resampler configuration */
+	inlen = FRAME_SIZE;
+	outlen = (FRAME_SIZE * frate) / 8000;
+	outlen *= 16000;
+	outlen /= frate;
+	inbuf_sample_convert = malloc(outlen);
+	if (!inbuf_sample_convert)
+		err(1, "malloc");
 
 	speex_bits_init(&bits);
 	timestamp = 0;
@@ -254,9 +289,15 @@ capture(void *data)
 
 		inbytes = read(capture_priv.fd, inbuf, sizeof(inbuf));
 		if (inbytes > 0) {
+			speex_resampler_process_int(speex_resampler_tx,
+						    0, (void *)inbuf, &inlen,
+						    (void *)inbuf_sample_convert,
+						    &outlen);
+
 			speex_bits_reset(&bits);
 			/* Encode input buffer */
-			speex_encode_int(speex_enc_state, inbuf, &bits);
+			speex_encode_int(speex_enc_state,
+				(void *)inbuf_sample_convert, &bits);
 			/* Fill up the buffer with the encoded stream */
 			outbytes = speex_bits_write(&bits,
 						    outbuf + sizeof(*hdr),
@@ -275,6 +316,8 @@ capture(void *data)
 				warn("sendto");
 		}
 	} while (1);
+
+	free(inbuf_sample_convert);
 
 	speex_bits_destroy(&bits);
 
@@ -367,6 +410,15 @@ init_speex(void)
 	speex_encoder_ctl(speex_enc_state, SPEEX_SET_COMPLEXITY, &tmp);
 	/* Init the Speex Jitter Buffer */
 	speex_jitter_init(&speex_jitter, speex_dec_state);
+	/* Init Speex resampler */
+	speex_resampler_tx = speex_resampler_init(fchan, frate,
+						  16000,
+						  SPEEX_RESAMPLER_QUALITY_DESKTOP,
+						  &tmp);
+	speex_resampler_rx = speex_resampler_init(fchan, 16000,
+						  frate,
+						  SPEEX_RESAMPLER_QUALITY_DESKTOP,
+						  &tmp);
 }
 
 static void
@@ -382,6 +434,8 @@ deinit_speex(void)
 	speex_encoder_destroy(speex_enc_state);
 	speex_decoder_destroy(speex_dec_state);
 	speex_jitter_destroy(&speex_jitter);
+	speex_resampler_destroy(speex_resampler_tx);
+	speex_resampler_destroy(speex_resampler_rx);
 }
 
 int
@@ -523,8 +577,6 @@ main(int argc, char *argv[])
 	pthread_mutex_init(&playback_state_lock, NULL);
 	pthread_mutex_init(&capture_state_lock, NULL);
 	pthread_mutex_init(&speex_jitter_lock, NULL);
-
-	pthread_mutex_init(&src_state_lock, NULL);
 
 	ret = pthread_create(&playback_thread, NULL,
 			     playback, &playback_state);
