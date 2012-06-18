@@ -2,8 +2,8 @@ What is it?
 ===========
 
 A simple UDP based voice chat program.  Currently
-we have support for libspeex.
-There will also be dtls support soon.
+we have support for libspeex.  There will also be
+ssl support in future versions.
 
 Why?
 ====
