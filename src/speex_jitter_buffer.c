@@ -52,13 +52,11 @@ speex_jitter_get(SpeexJitter *jitter, spx_int16_t *out,
 	packet.data = data;
 	packet.len = 2048;
 
-	if (jitter->valid_bits)
-	{
+	if (jitter->valid_bits) {
 		/* Try decoding last received packet */
 		ret = speex_decode_int(jitter->dec,
 				       &jitter->current_packet, out);
-		if (ret == 0)
-		{
+		if (ret == 0) {
 			jitter_buffer_tick(jitter->packets);
 			return;
 		} else {
@@ -69,8 +67,7 @@ speex_jitter_get(SpeexJitter *jitter, spx_int16_t *out,
 	ret = jitter_buffer_get(jitter->packets, &packet,
 				jitter->frame_size, NULL);
 
-	if (ret != JITTER_BUFFER_OK)
-	{
+	if (ret != JITTER_BUFFER_OK) {
 		speex_decode_int(jitter->dec, NULL, out);
 	} else {
 		speex_bits_read_from(&jitter->current_packet,
@@ -78,8 +75,7 @@ speex_jitter_get(SpeexJitter *jitter, spx_int16_t *out,
 		/* Decode packet */
 		ret = speex_decode_int(jitter->dec,
 				       &jitter->current_packet, out);
-		if (ret == 0)
-		{
+		if (ret == 0) {
 			jitter->valid_bits = 1;
 		} else {
 			/* Error while decoding */
