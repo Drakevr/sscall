@@ -56,7 +56,7 @@ speex_jitter_get(SpeexJitter *jitter, spx_int16_t *out,
 		/* Try decoding last received packet */
 		ret = speex_decode_int(jitter->dec,
 				       &jitter->current_packet, out);
-		if (ret == 0) {
+		if (!ret) {
 			jitter_buffer_tick(jitter->packets);
 			return;
 		} else {
@@ -75,7 +75,7 @@ speex_jitter_get(SpeexJitter *jitter, spx_int16_t *out,
 		/* Decode packet */
 		ret = speex_decode_int(jitter->dec,
 				       &jitter->current_packet, out);
-		if (ret == 0) {
+		if (!ret) {
 			jitter->valid_bits = 1;
 		} else {
 			/* Error while decoding */
