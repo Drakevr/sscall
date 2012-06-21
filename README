@@ -37,13 +37,13 @@ This will stream your voice to machine 192.168.1.2
 on port 1234.  Similarly on the other side you can
 connect on port 4321 on the local machine.
 
-Note that if you use anything else other than an 8kHz
+Note that if you use anything else other than an 16kHz
 input sample rate, then you need to run sscall with the
 appropriate arguments so that it can downsample the
 stream.
 
 Similarly on the receive path if you use anything else
-other than 8kHz, then sscall will upsample to that sample
+other than 16kHz, then sscall will upsample to that sample
 rate.
 
 These options are generally useful if your system does

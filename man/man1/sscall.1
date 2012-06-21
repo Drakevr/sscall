@@ -10,12 +10,12 @@ sscall \- "Voice chat with your friends"
 This will stream your voice to the "Remote IP"
 on the "Remote Port".  Similarly on the other
 side you can connect on "Local Port" on the local machine.
-Note that if you use anything else other than an 8kHz
+Note that if you use anything else other than an 16kHz
 input sample rate, then you need to run \fIsscall\fR with the
 appropriate arguments so that it can downsample the
 stream.
 Similarly on the receive path if you use anything else
-other than 8kHz, then \fIsscall\fR will upsample to that sample
+other than 16kHz, then \fIsscall\fR will upsample to that sample
 rate.
 These options are generally useful if your system does
 not support certain input/output sample rates.
