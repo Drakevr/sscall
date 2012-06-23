@@ -44,8 +44,9 @@ uninstall:
 dist: clean
 	mkdir -p sscall-${VER}
 	cp -R CONTRIBUTORS LICENSE linux Makefile \
-		man obsd README src test-files \
-		TODO sscall-${VER}
+		PROTOCOL img man obsd README list.h sscall.c \
+		speex_jitter_buffer.c speex_jitter_buffer.h \
+		test-files TODO sscall-${VER}
 	tar -cf sscall-${VER}.tar sscall-${VER}
 	gzip sscall-${VER}.tar
 	rm -rf sscall-${VER}
