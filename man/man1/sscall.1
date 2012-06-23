@@ -1,53 +1,78 @@
-.\" sscall Manpage.
-.TH SSCALL "1" "June 2012" "Voice Chatting utility" "#2f30"
-.SH NAME
-sscall \- "Voice chat with your friends"
-.SH SYNOPSIS
-.B my-rec.sh | sscall
-[\fIOPTIONS\fR] [\fIRemote IP\fR] [\fIRemote Port\fR] [\fILocal Port\fR]
-.SH DESCRIPTION
-.PP
-This will stream your voice to the "Remote IP"
-on the "Remote Port".  Similarly on the other
-side you can connect on "Local Port" on the local machine.
-Note that if you use anything else other than an 16kHz
-input sample rate, then you need to run \fIsscall\fR with the
-appropriate arguments so that it can downsample the
-stream.
-Similarly on the receive path if you use anything else
-other than 16kHz, then \fIsscall\fR will upsample to that sample
-rate.
+.Dd June 23, 2012
+.Dt SSCALL 1
+.Os
+.Sh NAME
+.Nm sscall
+.Nd voice chat with your friends
+.Sh SYNOPSIS
+.Nm
+.Op Fl v
+.Op Fl b Ar brate
+.Op Fl r Ar srate
+.Op Fl c Ar nchan
+.Op Fl d Ar drvid
+.Ar rhost rport lport
+.Nm
+.Op Fl Vh
+.Sh DESCRIPTION
+The
+.Nm
+command will stream the stdin to the remote host
+.Ar rhost
+on the remote port
+.Ar rport .
+Similarly, the remote side can connect to the
+.Ar lport
+port on the local machine.  Note that
+.Nm
+uses a sample rate of 16kHz for all network communication.
+If you cannot provide input audio of that type, you should tell
+.Nm
+to resample the audio using the
+.Ar brate
+option.  This will also affect output audio playback.
 These options are generally useful if your system does
 not support certain input/output sample rates.
-.PP
-Supplementary arguments include:
-.TP
-\fB\-b\fR
-Bits per sample.
-.TP
-\fB\-r\fR
-Samples per second (in a single channel).
-.TP
-\fB\-c\fR
-Number of channels.
-.TP
-\fB\-d\fR
-Override default driver ID.
-.TP
-\fB\-v\fR
+.Pp
+The options are as follows:
+.Bl -tag
+.It Fl v
 Enable verbose output.
-.TP
-\fB\-V\fR
+.It Fl b Ar brate
+Use
+.Ar brate
+bits per sample.
+.It Fl r Ar srate
+Use
+.Ar srate
+samples per second (in a single channel).
+.It Fl c Ar nchan
+Set the number of channels to
+.Ar nchan .
+.It Fl d Ar drvid
+Use the audio backend with id
+.Ar drvid
+instead of the default libao driver.  See
+.Xr libao.conf 5
+for more information.
+.It Fl V
 Print version information.
-.TP
-\fB\-h\fR
-Print the help screen.
-.SH AUTHOR
-Written by quantumdream
-.SH ACKNOWLEDGEMENTS
+.It Fl h
+Show the help screen.
+.El
+.Sh EXAMPLES
+Talk with host mypal at port 8888, opening local port 9999
+for the incoming stream; the script my-rec.sh should handle voice
+recording from the sound card's microphone:
+.Pp
+.Dl $ my-rec.sh | sscall mypal 8888 9999
+.Pp
+.Sh AUTHOR
+Written by quantumdream.
+.Sh ACKNOWLEDGEMENTS
 The people behind 2f30.org have been very helpful and their
 ideas have been much appreciated.
-.SH COPYRIGHT
+.Sh COPYING
 Copyright \(co 2012 quantumdream.
-.br
-This is free software distributed under MIT/X Consortium License.
+.Pp
+This is free software distributed under the MIT/X Consortium License.
