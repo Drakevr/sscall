@@ -261,10 +261,10 @@ capture(void *data)
 {
 	struct capture_state *state = data;
 	SpeexBits bits;
-	spx_int16_t inbuf[FRAME_SIZE];
+	spx_int16_t *inbuf;
 	char outbuf[COMPRESSED_BUF_SIZE];
-	char *inbuf_sample_convert;
-	ssize_t inbytes;
+	char inbuf_sample_convert[FRAME_SIZE];
+	ssize_t inbytes, bytes;
 	size_t outbytes;
 	spx_uint32_t inlen;
 	spx_uint32_t outlen;
@@ -272,13 +272,13 @@ capture(void *data)
 	int timestamp;
 	struct compressed_header *hdr;
 
-	/* Prepare the resampler configuration */
-	inlen = FRAME_SIZE;
-	outlen = (FRAME_SIZE * frate) / 8000;
-	outlen *= 16000;
-	outlen /= frate;
-	inbuf_sample_convert = malloc(outlen);
-	if (!inbuf_sample_convert)
+	/* Prepare Speex resampler configuration */
+	outlen = FRAME_SIZE;
+	inbytes = (FRAME_SIZE * frate) / 8000;
+	inbytes *= frate;
+	inbytes /= frate;
+	inbuf = malloc(inbytes);
+	if (!inbuf)
 		err(1, "malloc");
 
 	speex_bits_init(&bits);
@@ -291,8 +291,10 @@ capture(void *data)
 		}
 		pthread_mutex_unlock(&capture_state_lock);
 
-		inbytes = read(capture_priv.fd, inbuf, sizeof(inbuf));
-		if (inbytes > 0) {
+		bytes = read(capture_priv.fd, inbuf, inbytes);
+		if (bytes > 0) {
+			/* Input length should be in frames */
+			inlen = bytes / 2;
 			/* Sampler convert the TX path */
 			speex_resampler_process_int(speex_resampler_tx,
 						    0, (void *)inbuf, &inlen,
@@ -322,7 +324,7 @@ capture(void *data)
 		}
 	} while (1);
 
-	free(inbuf_sample_convert);
+	free(inbuf);
 
 	speex_bits_destroy(&bits);
 
