@@ -1,6 +1,6 @@
 BIN = sscall
 VER = 0.2-rc3
-SRC = src/sscall.c src/speex_jitter_buffer.c
+SRC = sscall.c speex_jitter_buffer.c
 OBJ = ${SRC:.c=.o}
 
 PREFIX = /usr
