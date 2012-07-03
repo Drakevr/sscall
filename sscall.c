@@ -310,7 +310,7 @@ capture(void *data)
 				/* Pre-append the header */
 				hdr = (struct compressed_header *)outbuf;
 				hdr->sig = htonl(0xcafebabe);
-				hdr->timestamp = timestamp;
+				hdr->timestamp = htonl(timestamp);
 				timestamp += FRAME_SIZE;
 
 				/* Send the buffer out */
