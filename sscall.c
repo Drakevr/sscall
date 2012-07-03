@@ -408,9 +408,9 @@ init_opus(void)
 {
 	int error;
 
-	opus_enc = opus_encoder_create(frate, fchan,
+	opus_enc = opus_encoder_create(16000, fchan,
 				       OPUS_APPLICATION_VOIP, &error);
-	opus_dec = opus_decoder_create(frate, fchan, &error);
+	opus_dec = opus_decoder_create(16000, fchan, &error);
 }
 
 static void
