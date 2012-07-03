@@ -122,6 +122,7 @@ playback(void *data)
 	spx_int16_t *pcm_sample_convert;
 	spx_uint32_t inlen;
 	spx_uint32_t outlen;
+	int ret;
 
 	/* Prepare the resampler configuration */
 	/* Input length is in frames */
@@ -168,16 +169,21 @@ playback(void *data)
 					  list);
 
 			/* Decode compressed buffer */
-			opus_decode(opus_dec, cbuf->buf, cbuf->len,
-				    pcm, FRAME_SIZE, 0);
-
-			/* Sample convert the RX path */
-			speex_resampler_process_int(speex_resampler_rx,
-						    0, (void *)pcm, &inlen,
-						    (void *)pcm_sample_convert,
-						    &outlen);
-			/* Outlen is in frames, convert to bytes */
-			outlen *= 2;
+			ret = opus_decode(opus_dec, cbuf->buf, cbuf->len,
+					  pcm, FRAME_SIZE, 0);
+			if (ret < 0) {
+				warnx("Failed to decode input packet: %d", ret);
+				/* Play silence if the decode failed */
+				memset(pcm_sample_convert, 0, outlen);
+			} else {
+				/* Sample convert the RX path */
+				speex_resampler_process_int(speex_resampler_rx,
+							    0, (void *)pcm, &inlen,
+							    (void *)pcm_sample_convert,
+							    &outlen);
+				/* Outlen is in frames, convert to bytes */
+				outlen *= 2;
+			}
 
 			/* Play via libao */
 			ao_play(device, (void *)pcm_sample_convert,
@@ -253,7 +259,7 @@ capture(void *data)
 	unsigned char outbuf[COMPRESSED_BUF_SIZE];
 	char inbuf_sample_convert[FRAME_SIZE];
 	ssize_t inbytes, bytes;
-	size_t outbytes;
+	opus_int32 outbytes;
 	spx_uint32_t inlen;
 	spx_uint32_t outlen;
 	ssize_t ret;
@@ -295,20 +301,26 @@ capture(void *data)
 					       (const void *)inbuf_sample_convert,
 					       FRAME_SIZE, outbuf + sizeof(*hdr),
 					       max_data_bytes);
+			if (outbytes < 0) {
+				warnx("Failed to encode packet: %d", outbytes);
+			} else if (outbytes == 1) {
+				/* Don't need to transmit this one */
+				continue;
+			} else {
+				/* Pre-append the header */
+				hdr = (struct compressed_header *)outbuf;
+				hdr->sig = htonl(0xcafebabe);
+				hdr->timestamp = timestamp;
+				timestamp += FRAME_SIZE;
 
-			/* Pre-append the header */
-			hdr = (struct compressed_header *)outbuf;
-			hdr->sig = htonl(0xcafebabe);
-			hdr->timestamp = timestamp;
-			timestamp += FRAME_SIZE;
-
-			/* Send the buffer out */
-			ret = sendto(capture_priv.sockfd, outbuf,
-				     outbytes + sizeof(*hdr), 0,
-				     capture_priv.servinfo->ai_addr,
-				     capture_priv.servinfo->ai_addrlen);
-			if (ret < 0)
-				warn("sendto");
+				/* Send the buffer out */
+				ret = sendto(capture_priv.sockfd, outbuf,
+					     outbytes + sizeof(*hdr), 0,
+					     capture_priv.servinfo->ai_addr,
+					     capture_priv.servinfo->ai_addrlen);
+				if (ret < 0)
+					warn("sendto");
+			}
 		}
 	} while (1);
 
