@@ -249,7 +249,7 @@ static void *
 capture(void *data)
 {
 	struct capture_state *state = data;
-	opus_int16 *inbuf;
+	spx_int16_t *inbuf;
 	unsigned char outbuf[COMPRESSED_BUF_SIZE];
 	char inbuf_sample_convert[FRAME_SIZE];
 	ssize_t inbytes, bytes;
