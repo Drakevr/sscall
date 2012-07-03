@@ -422,7 +422,16 @@ init_opus(void)
 
 	opus_enc = opus_encoder_create(16000, fchan,
 				       OPUS_APPLICATION_VOIP, &error);
+	if (error != OPUS_OK) {
+		errx(1, "Cannot create opus encoder: %s",
+		     opus_strerror(error));
+	}
+
 	opus_dec = opus_decoder_create(16000, fchan, &error);
+	if (error != OPUS_OK) {
+		errx(1, "Cannot create opus decoder: %s",
+		     opus_strerror(error));
+	}
 }
 
 static void
