@@ -109,7 +109,7 @@ static pthread_mutex_t playback_state_lock;
 static pthread_mutex_t capture_state_lock;
 
 /* Set to 1 when SIGINT is received */
-static volatile int handle_sigint;
+static volatile sig_atomic_t handle_sigint;
 
 /* Play back audio from the client */
 static void *
