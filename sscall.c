@@ -210,7 +210,6 @@ static void
 enqueue_for_playback(struct compressed_buf *cbuf)
 {
 	pthread_mutex_lock(&compressed_buf_lock);
-	INIT_LIST_HEAD(&cbuf->list);
 	list_add_tail(&cbuf->list, &compressed_buf.list);
 	pthread_cond_signal(&tx_pcm_cond);
 	pthread_mutex_unlock(&compressed_buf_lock);
