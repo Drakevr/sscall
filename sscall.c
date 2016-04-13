@@ -682,5 +682,5 @@ main(int argc, char *argv[])
 	freeaddrinfo(cli_servinfo);
 	freeaddrinfo(srv_servinfo);
 
-	return EXIT_SUCCESS;
+	return 0;
 }
