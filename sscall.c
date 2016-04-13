@@ -23,6 +23,9 @@
 #include <opus/opus.h>
 
 #include "list.h"
+#include "arg.h"
+
+char *argv0;
 
 /* Input/Output PCM buffer size */
 #define FRAME_SIZE (320)
@@ -332,10 +335,10 @@ capture(void *data)
 }
 
 static void
-usage(const char *s)
+usage(void)
 {
 	fprintf(stderr,
-		"usage: %s [OPTIONS] <remote-addr> <remote-port> <local-port>\n", s);
+		"usage: %s [OPTIONS] <remote-addr> <remote-port> <local-port>\n", argv0);
 	fprintf(stderr, " -b\tBits per sample\n");
 	fprintf(stderr, " -r\tSamples per second (in a single channel)\n");
 	fprintf(stderr, " -c\tNumber of channels\n");
@@ -468,46 +471,39 @@ main(int argc, char *argv[])
 	int ret;
 	socklen_t addr_len;
 	struct sockaddr_storage their_addr;
-	char *prog;
-	int c;
 	char host[NI_MAXHOST];
 	int optval;
 
-	prog = *argv;
-	while ((c = getopt(argc, argv, "hb:c:r:d:vV")) != -1) {
-		switch (c) {
-		case 'h':
-			usage(prog);
-			exit(0);
-			break;
-		case 'b':
-			fbits = strtol(optarg, NULL, 10);
-			break;
-		case 'c':
-			fchan = strtol(optarg, NULL, 10);
-			break;
-		case 'r':
-			frate = strtol(optarg, NULL, 10);
-			break;
-		case 'd':
-			fdevid = strtol(optarg, NULL, 10);
-			break;
-		case 'v':
-			fverbose = 1;
-			break;
-		case 'V':
-			printf("%s\n", VERSION);
-			exit(0);
-		case '?':
-		default:
-			exit(1);
-		}
-	}
-	argc -= optind;
-	argv += optind;
+        ARGBEGIN {
+        case 'h':
+                usage();
+                exit(0);
+                break;
+        case 'b':
+                fbits = strtol(EARGF(usage()), NULL, 10);
+                break;
+        case 'c':
+                fchan = strtol(EARGF(usage()), NULL, 10);
+                break;
+        case 'r':
+                frate = strtol(EARGF(usage()), NULL, 10);
+                break;
+        case 'd':
+                fdevid = strtol(EARGF(usage()), NULL, 10);
+                break;
+        case 'v':
+                fverbose = 1;
+                break;
+        case 'V':
+                printf("%s\n", VERSION);
+                exit(0);
+        case '?':
+        default:
+                exit(1);
+        } ARGEND
 
 	if (argc != 3) {
-		usage(prog);
+		usage();
 		exit(1);
 	}
 
